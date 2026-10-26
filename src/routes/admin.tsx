@@ -25,7 +25,7 @@ const input = "w-full rounded-md border border-input bg-background px-2 py-1.5 t
 
 function Admin() {
   const programs = usePrograms();
-  const [slug, setSlug] = useState(programs[0].slug);
+  const [slug, setSlug] = useState(programs[0]?.slug ?? "kutit-culture");
   const program = programs.find((p) => p.slug === slug)!;
 
   const patchTier = (evId: string, tierId: string, fn: (t: TicketTier) => TicketTier) =>
