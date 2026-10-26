@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Pitch mockup: program/event/ticket data lives in src/lib/store.ts (browser-saved, no backend yet); pricing rules in src/lib/pricing.ts with tests — keep price logic pure so it can move server-side later.
