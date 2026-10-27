@@ -3,7 +3,7 @@ import { useState } from "react";
 import { seedPrograms, usePrograms } from "@/lib/store";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Ticket } from "@/components/Ticket";
-import { activePhase, ksh, nextPhase, tierStatus } from "@/lib/pricing";
+import { activePhase, ksh, tierStatus } from "@/lib/pricing";
 
 export const Route = createFileRoute("/programs/$slug")({
   loader: ({ params }) => {
@@ -60,13 +60,12 @@ function ProgramPage() {
               {ev.tiers.map((t) => {
                 const s = tierStatus(t);
                 const ph = activePhase(t);
-                const nx = nextPhase(t);
                 return (
                   <div key={t.id} className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-5">
                     <div>
                       <p className="font-display text-3xl">{t.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {ph?.label ?? "Not yet on sale"}{nx && <> · rises to {ksh(nx.price)} on {new Date(nx.startsAt).toLocaleDateString("en-KE")}</>}
+                        {ph?.label ?? "Not yet on sale"}
                       </p>
                       <p className="text-xs text-muted-foreground">Sales close {new Date(t.salesEndAt).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" })} · {t.quantity - t.sold} left</p>
                     </div>
