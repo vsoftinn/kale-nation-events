@@ -11,6 +11,7 @@ export const Route = createFileRoute("/admin")({
       { name: "description", content: "Program owners manage events, ticket prices, scheduled price changes and expiry." },
       { property: "og:title", content: "Kalee Nation Owner Portal" },
       { property: "og:description", content: "Run your program independently on Kalee Nation." },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Admin,
