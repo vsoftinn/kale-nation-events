@@ -28,3 +28,9 @@ describe("ticket pricing", () => {
     expect(tierStatus({ ...tier, sold: 10 }, new Date("2026-01-15"))).toBe("sold-out");
   });
 });
+
+describe("admin closing tickets", () => {
+  it("a closed tier cannot be bought even while on sale", () => {
+    expect(tierStatus({ ...tier, closed: true }, new Date("2026-01-15"))).toBe("closed");
+  });
+});
