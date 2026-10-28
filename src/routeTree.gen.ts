@@ -10,17 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ProgramsSlugRouteImport } from './routes/programs.$slug'
+import { Route as ApiPublicJobsAutoPostsRouteImport } from './routes/api/public/jobs/auto-posts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgramsSlugRoute = ProgramsSlugRouteImport.update({
@@ -28,35 +23,40 @@ const ProgramsSlugRoute = ProgramsSlugRouteImport.update({
   path: '/programs/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsAutoPostsRoute = ApiPublicJobsAutoPostsRouteImport.update({
+  id: '/api/public/jobs/auto-posts',
+  path: '/api/public/jobs/auto-posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/programs/$slug'
+  fullPaths: '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/programs/$slug'
-  id: '__root__' | '/' | '/admin' | '/programs/$slug'
+  to: '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
+  id: '__root__' | '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
   ProgramsSlugRoute: typeof ProgramsSlugRoute
+  ApiPublicJobsAutoPostsRoute: typeof ApiPublicJobsAutoPostsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,13 +68,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/programs/$slug': {
       id: '/programs/$slug'
       path: '/programs/$slug'
@@ -82,13 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgramsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/auto-posts': {
+      id: '/api/public/jobs/auto-posts'
+      path: '/api/public/jobs/auto-posts'
+      fullPath: '/api/public/jobs/auto-posts'
+      preLoaderRoute: typeof ApiPublicJobsAutoPostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
   ProgramsSlugRoute: ProgramsSlugRoute,
+  ApiPublicJobsAutoPostsRoute: ApiPublicJobsAutoPostsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
