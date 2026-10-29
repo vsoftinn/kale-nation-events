@@ -10,12 +10,48 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as OrganizersRouteImport } from './routes/organizers'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
+import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
+import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as EventsIdRouteImport } from './routes/events.$id'
 import { Route as ProgramsSlugRouteImport } from './routes/programs.$slug'
 import { Route as ApiPublicJobsAutoPostsRouteImport } from './routes/api/public/jobs/auto-posts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizersRoute = OrganizersRouteImport.update({
+  id: '/organizers',
+  path: '/organizers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIdRoute = EventsIdRouteImport.update({
+  id: '/events/$id',
+  path: '/events/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgramsSlugRoute = ProgramsSlugRouteImport.update({
@@ -31,31 +67,83 @@ const ApiPublicJobsAutoPostsRoute = ApiPublicJobsAutoPostsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/organizers': typeof OrganizersRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/events/$id': typeof EventsIdRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/blog/': typeof BlogIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/organizers': typeof OrganizersRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/events/$id': typeof EventsIdRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/blog': typeof BlogIndexRoute
+  '/events': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/organizers': typeof OrganizersRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/events/$id': typeof EventsIdRoute
   '/programs/$slug': typeof ProgramsSlugRoute
+  '/blog/': typeof BlogIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/organizers'
+    | '/blog/$slug'
+    | '/events/$id'
+    | '/programs/$slug'
+    | '/blog/'
+    | '/events/'
+    | '/api/public/jobs/auto-posts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
-  id: '__root__' | '/' | '/programs/$slug' | '/api/public/jobs/auto-posts'
+  to:
+    | '/'
+    | '/about'
+    | '/organizers'
+    | '/blog/$slug'
+    | '/events/$id'
+    | '/programs/$slug'
+    | '/blog'
+    | '/events'
+    | '/api/public/jobs/auto-posts'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/organizers'
+    | '/blog/$slug'
+    | '/events/$id'
+    | '/programs/$slug'
+    | '/blog/'
+    | '/events/'
+    | '/api/public/jobs/auto-posts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  OrganizersRoute: typeof OrganizersRoute
+  BlogSlugRoute: typeof BlogSlugRoute
+  EventsIdRoute: typeof EventsIdRoute
   ProgramsSlugRoute: typeof ProgramsSlugRoute
+  BlogIndexRoute: typeof BlogIndexRoute
+  EventsIndexRoute: typeof EventsIndexRoute
   ApiPublicJobsAutoPostsRoute: typeof ApiPublicJobsAutoPostsRoute
 }
 
@@ -66,6 +154,48 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizers': {
+      id: '/organizers'
+      path: '/organizers'
+      fullPath: '/organizers'
+      preLoaderRoute: typeof OrganizersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/': {
+      id: '/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$id': {
+      id: '/events/$id'
+      path: '/events/$id'
+      fullPath: '/events/$id'
+      preLoaderRoute: typeof EventsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/programs/$slug': {
@@ -87,7 +217,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  OrganizersRoute: OrganizersRoute,
+  BlogSlugRoute: BlogSlugRoute,
+  EventsIdRoute: EventsIdRoute,
   ProgramsSlugRoute: ProgramsSlugRoute,
+  BlogIndexRoute: BlogIndexRoute,
+  EventsIndexRoute: EventsIndexRoute,
   ApiPublicJobsAutoPostsRoute: ApiPublicJobsAutoPostsRoute,
 }
 export const routeTree = rootRouteImport

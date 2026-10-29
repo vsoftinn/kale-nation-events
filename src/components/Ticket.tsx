@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import type { EventItem, Program } from "@/lib/store";
+import type { EventItem, Program } from "@/lib/catalog";
 import { ksh } from "@/lib/pricing";
 
 export function Ticket({
