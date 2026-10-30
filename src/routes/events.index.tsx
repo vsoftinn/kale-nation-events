@@ -18,7 +18,7 @@ export const Route = createFileRoute("/events/")({
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(programsQuery),
   component: EventsPage,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
   notFoundComponent: () => <p className="p-24 text-center">No events found.</p>,
 });
 

@@ -11,7 +11,7 @@ export function NewsTicker({ posts }: { posts: Post[] }) {
     return () => clearInterval(t);
   }, [posts.length]);
   if (!posts.length) return null;
-  const visible = Array.from({ length: Math.min(3, posts.length) }, (_, i) => posts[(start + i) % posts.length]);
+  const visible = Array.from({ length: Math.min(3, posts.length) }, (_, i) => posts[(start + i) % posts.length]!);
   return (
     <div className="grid gap-6 md:grid-cols-3">
       {visible.map((p) => (
