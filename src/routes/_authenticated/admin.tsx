@@ -237,8 +237,6 @@ function NewsTab() {
     queryKey: ["admin-posts"],
     queryFn: async () => (await supabase.from("posts").select("*").order("created_at", { ascending: false }).limit(100)).data?.map(mapPost) ?? [],
   });
-  const state = useQuery({ queryKey: ["automation"], queryFn: async () => (await supabase.rpc("has_role", { _user_id: "00000000-0000-0000-0000-000000000000", _role: "admin" }), null) });
-  void state;
   const refresh = () => { qc.invalidateQueries({ queryKey: ["admin-posts"] }); qc.invalidateQueries({ queryKey: ["posts"] }); };
   const setStatus = async (id: string, status: string) => {
     await supabase.from("posts").update({ status, published_at: status === "published" ? new Date().toISOString() : null }).eq("id", id);
@@ -317,7 +315,7 @@ function NewsTab() {
   );
 }
 
-function AdminsTab({ prefill }: { prefill?: string }) {
+function AdminsTab() {
   const qc = useQueryClient();
   const { data: programs } = useAdminPrograms();
   const createFn = useServerFn(createAdmin);
@@ -340,7 +338,7 @@ function AdminsTab({ prefill }: { prefill?: string }) {
       <form onSubmit={submit} className="space-y-3 rounded-xl border border-border bg-card p-6">
         <h1 className="text-5xl">Create admin login</h1>
         <p className="text-sm text-muted-foreground">The admin can only manage the program you choose.</p>
-        <input name="email" type="email" defaultValue={prefill} placeholder="Admin email" className={inp} required />
+        <input name="email" type="email" placeholder="Admin email" className={inp} required />
         <input name="password" type="text" placeholder="Temporary password (8+ characters)" minLength={8} className={inp} required />
         <select name="program" className={inp} required>
           {(programs ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
