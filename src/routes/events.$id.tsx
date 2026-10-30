@@ -20,7 +20,7 @@ export const Route = createFileRoute("/events/$id")({
     ],
   }),
   component: EventPage,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
   notFoundComponent: () => (
     <div className="p-24 text-center"><h1 className="text-5xl">Event not found</h1><Link to="/events" className="text-primary">See all events</Link></div>
   ),

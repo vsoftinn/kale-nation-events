@@ -17,7 +17,7 @@ export const Route = createFileRoute("/blog/$slug")({
     ],
   }),
   component: PostPage,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
   notFoundComponent: () => <div className="p-24 text-center"><h1 className="text-5xl">Post not found</h1><Link to="/blog" className="text-primary">All news</Link></div>,
 });
 

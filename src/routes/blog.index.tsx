@@ -16,7 +16,7 @@ export const Route = createFileRoute("/blog/")({
   }),
   loader: ({ context }) => context.queryClient.ensureQueryData(postsQuery),
   component: Blog,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
   notFoundComponent: () => <p className="p-24 text-center">No posts.</p>,
 });
 

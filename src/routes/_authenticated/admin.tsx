@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -164,7 +165,7 @@ function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: stri
 type Run = (p: PromiseLike<{ error: { message: string } | null }>) => Promise<void>;
 
 function EventEditor({ ev, run }: { ev: EventItem; run: Run }) {
-  const upd = (patch: Record<string, unknown>) => run(supabase.from("events").update(patch).eq("id", ev.id));
+  const upd = (patch: any) => run(supabase.from("events").update(patch).eq("id", ev.id));
   return (
     <div className="space-y-4 rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -193,8 +194,8 @@ function EventEditor({ ev, run }: { ev: EventItem; run: Run }) {
 
 function TierEditor({ t, run }: { t: TicketTier; run: Run }) {
   const s = tierStatus(t);
-  const upd = (patch: Record<string, unknown>) => run(supabase.from("ticket_tiers").update(patch).eq("id", t.id));
-  const updPh = (id: string, patch: Record<string, unknown>) => run(supabase.from("price_phases").update(patch).eq("id", id));
+  const upd = (patch: any) => run(supabase.from("ticket_tiers").update(patch).eq("id", t.id));
+  const updPh = (id: string, patch: any) => run(supabase.from("price_phases").update(patch).eq("id", id));
   return (
     <div className="rounded-lg border border-border bg-background p-4">
       <div className="flex flex-wrap items-center gap-3">

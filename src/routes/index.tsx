@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
   }),
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(programsQuery), context.queryClient.ensureQueryData(postsQuery)]),
   component: Index,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
 });
 
 const services = [

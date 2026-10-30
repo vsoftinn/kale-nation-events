@@ -17,7 +17,7 @@ export const Route = createFileRoute("/programs/$slug")({
     ],
   }),
   component: ProgramPage,
-  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{String((error as Error)?.message ?? error)}</p>,
   notFoundComponent: () => <div className="p-24 text-center"><h1 className="text-5xl">Program not found</h1><Link to="/" className="text-primary">Home</Link></div>,
 });
 
