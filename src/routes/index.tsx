@@ -1,7 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import heroImg from "@/assets/hero.jpg";
-import { usePrograms } from "@/lib/store";
-import { SiteHeader } from "@/components/SiteHeader";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
+import { NewsTicker } from "@/components/NewsTicker";
+import { programsQuery } from "./events.index";
+import { postsQuery } from "./blog.index";
+import { imageFor } from "@/lib/catalog";
 import { RunnerBolt } from "@/components/Loader";
 
 export const Route = createFileRoute("/")({
@@ -11,10 +15,14 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Club hosting, pre-weddings, weddings, corporate events and marketing. Buy tickets for Kutit Culture, SimbaFest and more." },
       { property: "og:title", content: "Kalee Nation — Events & Ticketing" },
       { property: "og:description", content: "Kenya's home for culture festivals, club nights and unforgettable events." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [{ rel: "preload", as: "image", href: heroImg, fetchpriority: "high" }],
   }),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(programsQuery), context.queryClient.ensureQueryData(postsQuery)]),
   component: Index,
+  errorComponent: ({ error }) => <p className="p-24 text-center">{error.message}</p>,
 });
 
 const services = [
@@ -39,7 +47,8 @@ const steps = [
 ];
 
 function Index() {
-  const programs = usePrograms();
+  const { data: programs } = useSuspenseQuery(programsQuery);
+  const { data: posts } = useSuspenseQuery(postsQuery);
   return (
     <div className="overflow-x-hidden">
       <SiteHeader />
@@ -58,8 +67,8 @@ function Index() {
             Club hosting · Pre-weddings · Weddings · Corporate events · Marketing & branding. One home for Kenya's boldest programs.
           </p>
           <div className="mt-10 flex flex-wrap gap-3 animate-rise" style={{ animationDelay: ".3s" }}>
-            <a href="#programs" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">Get Tickets</a>
-            <a href="#contact" className="rounded-md border border-border bg-background/40 px-8 py-4 font-bold uppercase tracking-wider backdrop-blur hover:bg-secondary">Book Kalee Nation</a>
+            <Link to="/events" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">Get Tickets</Link>
+            <Link to="/organizers" className="rounded-md border border-border bg-background/40 px-8 py-4 font-bold uppercase tracking-wider backdrop-blur hover:bg-secondary">Sell your tickets</Link>
           </div>
         </div>
       </section>
@@ -97,7 +106,7 @@ function Index() {
             const ev = p.events[0];
             return (
               <Link key={p.slug} to="/programs/$slug" params={{ slug: p.slug }} className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 hover:-translate-y-1 hover:border-primary/60 hover:shadow-glow animate-rise" style={{ animationDelay: `${i * 0.1}s` }}>
-                <img src={p.image} alt={p.name} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[3/4] w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                <img src={imageFor(p.imageKey)} alt={p.name} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[3/4] w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-fade" />
                 <div className="absolute inset-x-0 bottom-0 p-6">
                   <p className="text-xs uppercase tracking-widest text-muted-foreground">by {p.owner}</p>
@@ -109,6 +118,17 @@ function Index() {
             );
           })}
         </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-24">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.3em] text-primary">News & upcoming</p>
+            <h2 className="mt-2 text-5xl sm:text-6xl">Fresh from the nation.</h2>
+          </div>
+          <Link to="/blog" className="font-bold uppercase tracking-wider text-primary">All news →</Link>
+        </div>
+        <div className="mt-10"><NewsTicker posts={posts} /></div>
       </section>
 
       <section className="border-y border-border bg-card py-24">
@@ -156,9 +176,7 @@ function Index() {
         </div>
       </section>
 
-      <footer className="border-t border-border py-10 text-center text-sm text-muted-foreground">
-        © 2026 Kalee Nation · Eldoret & Nairobi, Kenya
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
