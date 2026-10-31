@@ -5,8 +5,12 @@ import type { Database } from "@/integrations/supabase/types";
 import { mapEvent, mapPost, mapProgram, PROGRAM_SELECT } from "./catalog";
 
 function publicDb() {
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"]!;
-  return createClient<Database>(process.env["SUPABASE_URL"]!, key, {
+  // Server runtime values first; fall back to the values baked in at build time
+  // so a deployment (e.g. Vercel) that only has VITE_* still serves public data.
+  const url = process.env["SUPABASE_URL"] || import.meta.env["VITE_SUPABASE_URL"];
+  const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  if (!url || !key) throw new Error("Missing Supabase URL or publishable key");
+  return createClient<Database>(url, key, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
     global: {
       fetch: (input, init) => {
