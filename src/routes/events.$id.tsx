@@ -5,7 +5,7 @@ import { getEvent } from "@/lib/public.functions";
 import { imageFor } from "@/lib/catalog";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { Ticket } from "@/components/Ticket";
-import { activePhase, ksh, statusLabel, tierStatus } from "@/lib/pricing";
+import { activePhase, ksh, MAX_TICKETS_PER_ORDER, orderTotal, statusLabel, tierStatus } from "@/lib/pricing";
 
 const eventQuery = (id: string) => queryOptions({ queryKey: ["event", id], queryFn: () => getEvent({ data: { id } }), staleTime: 15_000 });
 
@@ -30,7 +30,11 @@ function EventPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(eventQuery(id));
   const { event: ev, program } = data;
-  const [bought, setBought] = useState<{ tier: string; price: number; code: string } | null>(null);
+  const [bought, setBought] = useState<{ tier: string; price: number; codes: string[]; total: number } | null>(null);
+  const [cart, setCart] = useState<{ tierId: string; qty: number } | null>(null);
+  const cartTier = cart ? ev.tiers.find((t) => t.id === cart.tierId) : undefined;
+  const cartPhase = cartTier ? activePhase(cartTier) : null;
+  const order = cartTier && cartPhase ? orderTotal(cartPhase.price, cart!.qty, cartTier.quantity - cartTier.sold) : null;
 
   return (
     <div>
@@ -76,21 +80,47 @@ function EventPage() {
                   <p className="font-display text-3xl text-primary">{ph ? ksh(ph.price) : "—"}</p>
                   <button
                     disabled={s !== "on-sale"}
-                    onClick={() => setBought({ tier: t.name, price: ph!.price, code: `KN-${Math.random().toString(36).slice(2, 8).toUpperCase()}` })}
+                    onClick={() => { setBought(null); setCart({ tierId: t.id, qty: 1 }); }}
                     className="mt-1 rounded-md bg-bolt px-4 py-2 text-sm font-bold uppercase text-primary-foreground disabled:cursor-not-allowed disabled:bg-none disabled:bg-muted disabled:text-muted-foreground"
                   >
-                    {s === "on-sale" ? "Buy" : statusLabel[s]}
+                    {s === "on-sale" ? (cart?.tierId === t.id ? "Selected" : "Buy") : statusLabel[s]}
                   </button>
                 </div>
               </div>
             );
           })}
           {!ev.tiers.length && <p className="text-muted-foreground">Tickets coming soon.</p>}
+          {cartTier && cartPhase && order && (
+            <div className="animate-rise rounded-xl border border-primary/60 bg-card p-5 shadow-glow">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Your order</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+                <p className="font-display text-2xl">{cartTier.name} × {order.qty}</p>
+                <div className="flex items-center gap-2">
+                  <button aria-label="Fewer tickets" onClick={() => setCart({ ...cart!, qty: order.qty - 1 })} disabled={order.qty <= 1} className="h-9 w-9 rounded-md border border-border text-xl disabled:opacity-40">−</button>
+                  <span className="w-8 text-center text-xl font-bold">{order.qty}</span>
+                  <button aria-label="More tickets" onClick={() => setCart({ ...cart!, qty: order.qty + 1 })} disabled={order.qty >= Math.min(MAX_TICKETS_PER_ORDER, cartTier.quantity - cartTier.sold)} className="h-9 w-9 rounded-md border border-border text-xl disabled:opacity-40">+</button>
+                </div>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{ksh(cartPhase.price)} each · max {MAX_TICKETS_PER_ORDER} per order</p>
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                <p className="text-lg">Total <span className="font-display text-3xl text-primary">{ksh(order.total)}</span></p>
+                <button
+                  onClick={() => {
+                    setBought({ tier: cartTier.name, price: cartPhase.price, total: order.total, codes: Array.from({ length: order.qty }, () => `KN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) });
+                    setCart(null);
+                  }}
+                  className="rounded-md bg-bolt px-5 py-3 font-bold uppercase text-primary-foreground"
+                >Proceed to pay</button>
+              </div>
+            </div>
+          )}
         </div>
         {bought && (
-          <div className="animate-rise lg:col-span-2">
-            <p className="mb-4 text-center text-sm uppercase tracking-widest text-primary">⚡ Payment received (demo) — here's your ticket</p>
-            <Ticket program={program} event={ev} tierName={bought.tier} price={bought.price} holder="Guest Attendee" code={bought.code} />
+          <div className="animate-rise space-y-8 lg:col-span-2">
+            <p className="text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received (demo) — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
+            {bought.codes.map((code) => (
+              <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder="Guest Attendee" code={code} />
+            ))}
           </div>
         )}
       </section>

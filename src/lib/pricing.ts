@@ -43,3 +43,11 @@ export const statusLabel: Record<TierStatus, string> = {
 };
 
 export const ksh = (n: number) => `KSh ${n.toLocaleString("en-KE")}`;
+
+export const MAX_TICKETS_PER_ORDER = 10;
+/** Total for an order; quantity is clamped to 1..min(MAX, remaining). */
+export function orderTotal(unitPrice: number, quantity: number, remaining: number = Infinity): { qty: number; total: number } {
+  const cap = Math.max(0, Math.min(MAX_TICKETS_PER_ORDER, remaining));
+  const qty = cap === 0 ? 0 : Math.min(cap, Math.max(1, Math.floor(quantity)));
+  return { qty, total: qty * unitPrice };
+}
