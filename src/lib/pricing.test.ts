@@ -34,3 +34,10 @@ describe("admin closing tickets", () => {
     expect(tierStatus({ ...tier, closed: true }, new Date("2026-01-15"))).toBe("closed");
   });
 });
+
+import { orderTotal as _orderTotal } from "./pricing";
+describe("orderTotal", () => {
+  it("sums price × quantity", () => expect(_orderTotal(1500, 3).total).toBe(4500));
+  it("caps at 10 per order", () => expect(_orderTotal(1000, 25).qty).toBe(10));
+  it("caps at tickets left", () => expect(_orderTotal(1000, 5, 2)).toEqual({ qty: 2, total: 2000 }));
+});
