@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { UpcomingStrip } from "./UpcomingStrip";
 import logo from "@/assets/kalee-logo.jpg.asset.json";
 
 const links = [
@@ -28,7 +29,9 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border py-10 text-sm text-muted-foreground">
+    <>
+    <UpcomingStrip />
+    <footer className="py-10 text-sm text-muted-foreground">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4">
         <p>© 2026 Kalee Nation · Eldoret & Nairobi, Kenya</p>
         <div className="flex gap-5">
@@ -39,5 +42,6 @@ export function SiteFooter() {
         </div>
       </div>
     </footer>
+    </>
   );
 }
