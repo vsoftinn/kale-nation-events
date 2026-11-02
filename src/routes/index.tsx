@@ -61,13 +61,13 @@ function Index() {
           </span>
           <RunnerBolt className="mt-6 mb-2 h-16 w-20 text-foreground animate-rise" />
           <h1 className="animate-rise text-7xl leading-[0.85] sm:text-8xl md:text-[10rem]">
-            Run with <br /><span className="text-bolt">the nation.</span>
+            Run with <br /><span className="text-aurora">the nation.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground animate-rise" style={{ animationDelay: ".15s" }}>
             Club hosting · Pre-weddings · Weddings · Corporate events · Marketing & branding. One home for Kenya's boldest programs.
           </p>
           <div className="mt-10 flex flex-wrap gap-3 animate-rise" style={{ animationDelay: ".3s" }}>
-            <Link to="/events" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">Get Tickets</Link>
+            <Link to="/events" className="rounded-md bg-aurora px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform duration-300 hover:-translate-y-0.5">Get Tickets</Link>
             <Link to="/organizers" className="rounded-md border border-border bg-background/40 px-8 py-4 font-bold uppercase tracking-wider backdrop-blur hover:bg-secondary">Sell your tickets</Link>
           </div>
         </div>
@@ -212,7 +212,7 @@ function Index() {
         <div className="bead-strip h-2" />
         <div className="mx-auto max-w-5xl px-4 py-24 text-center">
           <RunnerBolt className="mx-auto h-14 w-16 text-primary" />
-          <h2 className="mt-4 text-6xl sm:text-8xl">Let's make it <span className="text-bolt">legendary.</span></h2>
+          <h2 className="mt-4 text-6xl sm:text-8xl">Let's make it <span className="text-aurora">legendary.</span></h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">Planning a wedding, a launch or a festival? Tell us about it and the Kalee team will get back to you.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a href="mailto:hello@kaleenation.co.ke" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow">Email us</a>

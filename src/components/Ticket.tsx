@@ -15,7 +15,7 @@ export function Ticket({
         ))}
       </div>
       <div className="relative flex-1 p-6">
-        <div className="bead-strip absolute inset-x-0 top-0 h-2" />
+        <div className="bg-aurora absolute inset-x-0 top-0 h-2" />
         <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] opacity-70">Kalee Nation presents</p>
         <h3 className="mt-1 text-4xl leading-none">{event.title}</h3>
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
