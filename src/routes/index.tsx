@@ -120,6 +120,51 @@ function Index() {
         </div>
       </section>
 
+      <section id="events" className="mx-auto max-w-7xl px-4 pb-24">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.3em] text-primary">On sale now</p>
+            <h2 className="mt-2 text-5xl sm:text-7xl">Upcoming <span className="text-aurora">events.</span></h2>
+          </div>
+          <Link to="/events" className="rounded-md bg-aurora px-6 py-3 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">View all events →</Link>
+        </div>
+        {(() => {
+          const now = Date.now();
+          const upcoming = programs
+            .flatMap((p) => p.events.filter((e) => e.published && new Date(e.date).getTime() > now).map((e) => ({ e, p })))
+            .sort((a, b) => a.e.date.localeCompare(b.e.date))
+            .slice(0, 8);
+          if (!upcoming.length) return <p className="mt-10 text-muted-foreground">New events are coming soon.</p>;
+          return (
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {upcoming.map(({ e, p }, i) => {
+                const d = new Date(e.date);
+                return (
+                  <Link key={e.id} to="/events/$id" params={{ id: e.id }} className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 ease-out hover:-translate-y-1.5 hover:border-primary/60 hover:shadow-glow animate-rise" style={{ animationDelay: `${i * 0.06}s` }}>
+                    <div className="relative overflow-hidden">
+                      <img src={imageFor(p.imageKey)} alt={e.title} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[4/3] w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-110" />
+                      <div className="absolute left-3 top-3 rounded-lg bg-background/80 px-3 py-1 text-center backdrop-blur">
+                        <p className="font-display text-2xl leading-none text-aurora">{d.toLocaleDateString("en-KE", { day: "2-digit", timeZone: "Africa/Nairobi" })}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest">{d.toLocaleDateString("en-KE", { month: "short", timeZone: "Africa/Nairobi" })}</p>
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{p.name}</p>
+                      <h3 className="mt-1 text-3xl leading-tight">{e.title}</h3>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">{e.venue}, {e.city}</p>
+                      <div className="mt-4 flex items-center justify-between text-sm font-bold uppercase tracking-wider">
+                        <span className="text-muted-foreground transition-colors group-hover:text-foreground">Learn more</span>
+                        <span className="text-primary transition-transform duration-300 group-hover:translate-x-1">Buy tickets →</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </section>
+
       <section className="mx-auto max-w-7xl px-4 pb-24">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
