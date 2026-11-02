@@ -7,9 +7,15 @@ import { mapEvent, mapPost, mapProgram, PROGRAM_SELECT } from "./catalog";
 function publicDb() {
   // Server runtime values first; fall back to the values baked in at build time
   // so a deployment (e.g. Vercel) that only has VITE_* still serves public data.
-  const url = process.env["SUPABASE_URL"] || import.meta.env["VITE_SUPABASE_URL"];
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
-  if (!url || !key) throw new Error("Missing Supabase URL or publishable key");
+  const url = (process.env["SUPABASE_URL"] || import.meta.env["VITE_SUPABASE_URL"] || "").trim();
+  const key = (process.env["SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || "").trim();
+  const missing = [!url && "SUPABASE_URL / VITE_SUPABASE_URL", !key && "SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_PUBLISHABLE_KEY"].filter(Boolean);
+  if (missing.length) {
+    const msg = `Backend settings missing: ${missing.join(", ")}. Add them in your host's environment variables (all environments) and redeploy without build cache.`;
+    console.error(`[config] ${msg}`);
+    throw new Error(msg);
+  }
+  if (!/^https:\/\//.test(url)) throw new Error(`[config] SUPABASE_URL must start with https:// (got "${url.slice(0, 20)}…")`);
   return createClient<Database>(url, key, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
     global: {

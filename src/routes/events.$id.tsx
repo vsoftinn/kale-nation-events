@@ -30,7 +30,8 @@ function EventPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(eventQuery(id));
   const { event: ev, program } = data;
-  const [bought, setBought] = useState<{ tier: string; price: number; codes: string[]; total: number } | null>(null);
+  const [bought, setBought] = useState<{ tier: string; price: number; codes: string[]; total: number; holder: string } | null>(null);
+  const [holder, setHolder] = useState("");
   const [cart, setCart] = useState<{ tierId: string; qty: number } | null>(null);
   const cartTier = cart ? ev.tiers.find((t) => t.id === cart.tierId) : undefined;
   const cartPhase = cartTier ? activePhase(cartTier) : null;
@@ -102,14 +103,20 @@ function EventPage() {
                 </div>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{ksh(cartPhase.price)} each · max {MAX_TICKETS_PER_ORDER} per order</p>
+              <label className="mt-4 block text-xs uppercase tracking-widest text-muted-foreground">
+                Name of person paying
+                <input value={holder} onChange={(e) => setHolder(e.target.value)} maxLength={60} placeholder="e.g. Wanjiku Kamau"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
+              </label>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <p className="text-lg">Total <span className="font-display text-3xl text-primary">{ksh(order.total)}</span></p>
                 <button
+                  disabled={holder.trim().length < 2}
                   onClick={() => {
-                    setBought({ tier: cartTier.name, price: cartPhase.price, total: order.total, codes: Array.from({ length: order.qty }, () => `KN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) });
+                    setBought({ tier: cartTier.name, price: cartPhase.price, total: order.total, holder: holder.trim(), codes: Array.from({ length: order.qty }, () => `KN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) });
                     setCart(null);
                   }}
-                  className="rounded-md bg-bolt px-5 py-3 font-bold uppercase text-primary-foreground"
+                  className="rounded-md bg-aurora px-5 py-3 font-bold uppercase text-primary-foreground disabled:opacity-40"
                 >Proceed to pay</button>
               </div>
             </div>

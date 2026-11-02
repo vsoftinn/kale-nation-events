@@ -61,13 +61,13 @@ function Index() {
           </span>
           <RunnerBolt className="mt-6 mb-2 h-16 w-20 text-foreground animate-rise" />
           <h1 className="animate-rise text-7xl leading-[0.85] sm:text-8xl md:text-[10rem]">
-            Run with <br /><span className="text-bolt">the nation.</span>
+            Run with <br /><span className="text-aurora">the nation.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground animate-rise" style={{ animationDelay: ".15s" }}>
             Club hosting · Pre-weddings · Weddings · Corporate events · Marketing & branding. One home for Kenya's boldest programs.
           </p>
           <div className="mt-10 flex flex-wrap gap-3 animate-rise" style={{ animationDelay: ".3s" }}>
-            <Link to="/events" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">Get Tickets</Link>
+            <Link to="/events" className="rounded-md bg-aurora px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform duration-300 hover:-translate-y-0.5">Get Tickets</Link>
             <Link to="/organizers" className="rounded-md border border-border bg-background/40 px-8 py-4 font-bold uppercase tracking-wider backdrop-blur hover:bg-secondary">Sell your tickets</Link>
           </div>
         </div>
@@ -120,6 +120,51 @@ function Index() {
         </div>
       </section>
 
+      <section id="events" className="mx-auto max-w-7xl px-4 pb-24">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.3em] text-primary">On sale now</p>
+            <h2 className="mt-2 text-5xl sm:text-7xl">Upcoming <span className="text-aurora">events.</span></h2>
+          </div>
+          <Link to="/events" className="rounded-md bg-aurora px-6 py-3 font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition-transform hover:-translate-y-0.5">View all events →</Link>
+        </div>
+        {(() => {
+          const now = Date.now();
+          const upcoming = programs
+            .flatMap((p) => p.events.filter((e) => e.published && new Date(e.date).getTime() > now).map((e) => ({ e, p })))
+            .sort((a, b) => a.e.date.localeCompare(b.e.date))
+            .slice(0, 8);
+          if (!upcoming.length) return <p className="mt-10 text-muted-foreground">New events are coming soon.</p>;
+          return (
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {upcoming.map(({ e, p }, i) => {
+                const d = new Date(e.date);
+                return (
+                  <Link key={e.id} to="/events/$id" params={{ id: e.id }} className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 ease-out hover:-translate-y-1.5 hover:border-primary/60 hover:shadow-glow animate-rise" style={{ animationDelay: `${i * 0.06}s` }}>
+                    <div className="relative overflow-hidden">
+                      <img src={imageFor(p.imageKey)} alt={e.title} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[4/3] w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-110" />
+                      <div className="absolute left-3 top-3 rounded-lg bg-background/80 px-3 py-1 text-center backdrop-blur">
+                        <p className="font-display text-2xl leading-none text-aurora">{d.toLocaleDateString("en-KE", { day: "2-digit", timeZone: "Africa/Nairobi" })}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest">{d.toLocaleDateString("en-KE", { month: "short", timeZone: "Africa/Nairobi" })}</p>
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{p.name}</p>
+                      <h3 className="mt-1 text-3xl leading-tight">{e.title}</h3>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">{e.venue}, {e.city}</p>
+                      <div className="mt-4 flex items-center justify-between text-sm font-bold uppercase tracking-wider">
+                        <span className="text-muted-foreground transition-colors group-hover:text-foreground">Learn more</span>
+                        <span className="text-primary transition-transform duration-300 group-hover:translate-x-1">Buy tickets →</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </section>
+
       <section className="mx-auto max-w-7xl px-4 pb-24">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -167,7 +212,7 @@ function Index() {
         <div className="bead-strip h-2" />
         <div className="mx-auto max-w-5xl px-4 py-24 text-center">
           <RunnerBolt className="mx-auto h-14 w-16 text-primary" />
-          <h2 className="mt-4 text-6xl sm:text-8xl">Let's make it <span className="text-bolt">legendary.</span></h2>
+          <h2 className="mt-4 text-6xl sm:text-8xl">Let's make it <span className="text-aurora">legendary.</span></h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">Planning a wedding, a launch or a festival? Tell us about it and the Kalee team will get back to you.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a href="mailto:hello@kaleenation.co.ke" className="rounded-md bg-bolt px-8 py-4 font-bold uppercase tracking-wider text-primary-foreground shadow-glow">Email us</a>

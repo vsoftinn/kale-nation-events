@@ -15,12 +15,12 @@ export function Ticket({
         ))}
       </div>
       <div className="relative flex-1 p-6">
-        <div className="bead-strip absolute inset-x-0 top-0 h-2" />
+        <div className="bg-aurora absolute inset-x-0 top-0 h-2" />
         <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] opacity-70">Kalee Nation presents</p>
         <h3 className="mt-1 text-4xl leading-none">{event.title}</h3>
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div><p className="text-[10px] uppercase opacity-60">Date</p><p className="font-semibold">{d.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</p></div>
-          <div><p className="text-[10px] uppercase opacity-60">Gates</p><p className="font-semibold">{d.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}</p></div>
+          <div><p className="text-[10px] uppercase opacity-60">Date</p><p className="font-semibold">{d.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" })}</p></div>
+          <div><p className="text-[10px] uppercase opacity-60">Gate opens</p><p className="font-semibold">{d.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Nairobi" })}</p></div>
           <div><p className="text-[10px] uppercase opacity-60">Venue</p><p className="font-semibold">{event.venue}, {event.city}</p></div>
           <div><p className="text-[10px] uppercase opacity-60">Holder</p><p className="font-semibold">{holder}</p></div>
         </div>
