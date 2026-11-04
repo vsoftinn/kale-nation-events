@@ -15,3 +15,4 @@
 - Public signup is off; logins are created only by the super admin (src/lib/admin.functions.ts). First super admin is created on /auth only while none exists.
 - Admin portal is /admin (unlinked, noindex) under the _authenticated gate.
 - Auto-posting: /api/public/jobs/auto-posts (daily cron) drafts event posts + one AI news post as 'pending'; super admin approves before publish.
+- Payments: M-Pesa STK Push via src/lib/mpesa.server.ts; orders in ticket_orders, marked paid only by /api/public/mpesa/callback or STK query, tickets issued via complete_ticket_order() — server decides price, never the browser.

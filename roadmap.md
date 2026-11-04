@@ -5,3 +5,4 @@
 - [x] Rotating upcoming-events strip (pauses on tap/hover, links to event)
 - [x] Answer: how the site survives high traffic during ticket sales
 - [x] Admin: organizers/admins, events, tickets, price phases, expiry (already built — confirm)
+- [x] M-Pesa STK checkout (needs Daraja consumer key/secret)
