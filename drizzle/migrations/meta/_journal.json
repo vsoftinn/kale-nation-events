@@ -8,6 +8,13 @@
       "when": 1793199225263,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793803285455,
+      "tag": "0001_ticket_orders_mpesa",
+      "breakpoints": true
     }
   ]
 }
