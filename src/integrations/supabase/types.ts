@@ -266,6 +266,63 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_orders: {
+        Row: {
+          checkout_request_id: string | null
+          codes: string[]
+          created_at: string
+          event_id: string
+          holder: string
+          id: string
+          mpesa_receipt: string | null
+          paid_at: string | null
+          phone: string
+          quantity: number
+          result_desc: string | null
+          status: string
+          tier_id: string
+          tier_name: string
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          checkout_request_id?: string | null
+          codes?: string[]
+          created_at?: string
+          event_id: string
+          holder: string
+          id?: string
+          mpesa_receipt?: string | null
+          paid_at?: string | null
+          phone: string
+          quantity: number
+          result_desc?: string | null
+          status?: string
+          tier_id: string
+          tier_name: string
+          total: number
+          unit_price: number
+        }
+        Update: {
+          checkout_request_id?: string | null
+          codes?: string[]
+          created_at?: string
+          event_id?: string
+          holder?: string
+          id?: string
+          mpesa_receipt?: string | null
+          paid_at?: string | null
+          phone?: string
+          quantity?: number
+          result_desc?: string | null
+          status?: string
+          tier_id?: string
+          tier_name?: string
+          total?: number
+          unit_price?: number
+        }
+        Relationships: []
+      }
       ticket_tiers: {
         Row: {
           closed: boolean
@@ -331,6 +388,10 @@ export type Database = {
     }
     Functions: {
       can_manage_program: { Args: { _program_id: string }; Returns: boolean }
+      complete_ticket_order: {
+        Args: { _checkout: string; _codes: string[]; _receipt: string }
+        Returns: boolean
+      }
       event_program: { Args: { _event_id: string }; Returns: string }
       has_role: {
         Args: {
