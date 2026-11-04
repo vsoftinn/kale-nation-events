@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { orderStatus, startCheckout } from "@/lib/checkout.functions";
 import { getEvent } from "@/lib/public.functions";
 import { imageFor } from "@/lib/catalog";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
@@ -32,6 +34,26 @@ function EventPage() {
   const { event: ev, program } = data;
   const [bought, setBought] = useState<{ tier: string; price: number; codes: string[]; total: number; holder: string } | null>(null);
   const [holder, setHolder] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pay, setPay] = useState<{ orderId?: string; state: "idle" | "sending" | "waiting" | "failed"; msg?: string }>({ state: "idle" });
+  const start = useServerFn(startCheckout);
+  const check = useServerFn(orderStatus);
+  useEffect(() => {
+    if (pay.state !== "waiting" || !pay.orderId) return;
+    let stop = false; const began = Date.now();
+    const tick = async () => {
+      if (stop) return;
+      try {
+        const r = await check({ data: { orderId: pay.orderId! } });
+        if (r.status === "paid") { setBought({ tier: r.tierName, price: r.unitPrice, total: r.total, holder: r.holder, codes: r.codes }); setCart(null); setPay({ state: "idle" }); return; }
+        if (r.status === "failed") { setPay({ state: "failed", msg: r.message ?? "Payment was not completed" }); return; }
+      } catch { /* retry */ }
+      if (Date.now() - began > 120_000) { setPay({ state: "failed", msg: "No confirmation yet. If you paid, your tickets will be honoured — contact us with your M-Pesa message." }); return; }
+      setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 4000);
+    return () => { stop = true; };
+  }, [pay.state, pay.orderId]);
   const [cart, setCart] = useState<{ tierId: string; qty: number } | null>(null);
   const cartTier = cart ? ev.tiers.find((t) => t.id === cart.tierId) : undefined;
   const cartPhase = cartTier ? activePhase(cartTier) : null;
@@ -108,25 +130,35 @@ function EventPage() {
                 <input value={holder} onChange={(e) => setHolder(e.target.value)} maxLength={60} placeholder="e.g. Wanjiku Kamau"
                   className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
               </label>
+              <label className="mt-3 block text-xs uppercase tracking-widest text-muted-foreground">
+                M-Pesa phone number
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={16} placeholder="0712 345 678"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
+              </label>
+              {pay.state === "waiting" && <p className="mt-3 text-sm text-primary">📲 Check your phone and enter your M-Pesa PIN to pay {ksh(order.total)}…</p>}
+              {pay.state === "failed" && <p className="mt-3 text-sm text-destructive">{pay.msg}</p>}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <p className="text-lg">Total <span className="font-display text-3xl text-primary">{ksh(order.total)}</span></p>
                 <button
-                  disabled={holder.trim().length < 2}
-                  onClick={() => {
-                    setBought({ tier: cartTier.name, price: cartPhase.price, total: order.total, holder: holder.trim(), codes: Array.from({ length: order.qty }, () => `KN-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) });
-                    setCart(null);
+                  disabled={holder.trim().length < 2 || phone.replace(/\D/g, "").length < 9 || pay.state === "sending" || pay.state === "waiting"}
+                  onClick={async () => {
+                    setPay({ state: "sending" });
+                    try {
+                      const r = await start({ data: { tierId: cartTier.id, qty: order.qty, holder: holder.trim(), phone } });
+                      setPay({ state: "waiting", orderId: r.orderId });
+                    } catch (e) { setPay({ state: "failed", msg: (e as Error).message }); }
                   }}
                   className="rounded-md bg-aurora px-5 py-3 font-bold uppercase text-primary-foreground disabled:opacity-40"
-                >Proceed to pay</button>
+                >{pay.state === "sending" ? "Sending…" : pay.state === "waiting" ? "Waiting…" : "Pay with M-Pesa"}</button>
               </div>
             </div>
           )}
         </div>
         {bought && (
           <div className="animate-rise space-y-8 lg:col-span-2">
-            <p className="text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received (demo) — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
+            <p className="text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
             {bought.codes.map((code) => (
-              <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder="Guest Attendee" code={code} />
+              <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder={bought.holder} code={code} />
             ))}
           </div>
         )}
