@@ -271,12 +271,16 @@ export type Database = {
           checkout_request_id: string | null
           codes: string[]
           created_at: string
+          delivery_claimed_at: string | null
+          email: string | null
+          email_status: string | null
           event_id: string
           holder: string
           id: string
           mpesa_receipt: string | null
           paid_at: string | null
           phone: string
+          provider: string
           quantity: number
           result_desc: string | null
           status: string
@@ -284,17 +288,25 @@ export type Database = {
           tier_name: string
           total: number
           unit_price: number
+          whatsapp: string | null
+          whatsapp_error: string | null
+          whatsapp_message_id: string | null
+          whatsapp_status: string | null
         }
         Insert: {
           checkout_request_id?: string | null
           codes?: string[]
           created_at?: string
+          delivery_claimed_at?: string | null
+          email?: string | null
+          email_status?: string | null
           event_id: string
           holder: string
           id?: string
           mpesa_receipt?: string | null
           paid_at?: string | null
           phone: string
+          provider?: string
           quantity: number
           result_desc?: string | null
           status?: string
@@ -302,17 +314,25 @@ export type Database = {
           tier_name: string
           total: number
           unit_price: number
+          whatsapp?: string | null
+          whatsapp_error?: string | null
+          whatsapp_message_id?: string | null
+          whatsapp_status?: string | null
         }
         Update: {
           checkout_request_id?: string | null
           codes?: string[]
           created_at?: string
+          delivery_claimed_at?: string | null
+          email?: string | null
+          email_status?: string | null
           event_id?: string
           holder?: string
           id?: string
           mpesa_receipt?: string | null
           paid_at?: string | null
           phone?: string
+          provider?: string
           quantity?: number
           result_desc?: string | null
           status?: string
@@ -320,6 +340,10 @@ export type Database = {
           tier_name?: string
           total?: number
           unit_price?: number
+          whatsapp?: string | null
+          whatsapp_error?: string | null
+          whatsapp_message_id?: string | null
+          whatsapp_status?: string | null
         }
         Relationships: []
       }
@@ -379,6 +403,36 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_webhook_events: {
+        Row: {
+          delivery_id: string
+          event: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          received_at: string
+        }
+        Insert: {
+          delivery_id: string
+          event: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
+        }
+        Update: {
+          delivery_id?: string
+          event?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
         }
         Relationships: []
       }
