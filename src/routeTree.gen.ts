@@ -22,6 +22,8 @@ import { Route as EventsIdRouteImport } from './routes/events.$id'
 import { Route as ProgramsSlugRouteImport } from './routes/programs.$slug'
 import { Route as ApiPublicJobsAutoPostsRouteImport } from './routes/api/public/jobs/auto-posts'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa/callback'
+import { Route as ApiPublicPaystackWebhookRouteImport } from './routes/api/public/paystack/webhook'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -87,6 +89,18 @@ const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   path: '/api/public/mpesa/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPaystackWebhookRoute =
+  ApiPublicPaystackWebhookRouteImport.update({
+    id: '/api/public/paystack/webhook',
+    path: '/api/public/paystack/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicWhatsappWebhookRoute =
+  ApiPublicWhatsappWebhookRouteImport.update({
+    id: '/api/public/whatsapp/webhook',
+    path: '/api/public/whatsapp/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -101,6 +115,8 @@ export interface FileRoutesByFullPath {
   '/events/': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
   '/api/public/mpesa/callback': typeof ApiPublicMpesaCallbackRoute
+  '/api/public/paystack/webhook': typeof ApiPublicPaystackWebhookRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,6 +131,8 @@ export interface FileRoutesByTo {
   '/events': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
   '/api/public/mpesa/callback': typeof ApiPublicMpesaCallbackRoute
+  '/api/public/paystack/webhook': typeof ApiPublicPaystackWebhookRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,6 +149,8 @@ export interface FileRoutesById {
   '/events/': typeof EventsIndexRoute
   '/api/public/jobs/auto-posts': typeof ApiPublicJobsAutoPostsRoute
   '/api/public/mpesa/callback': typeof ApiPublicMpesaCallbackRoute
+  '/api/public/paystack/webhook': typeof ApiPublicPaystackWebhookRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -147,6 +167,8 @@ export interface FileRouteTypes {
     | '/events/'
     | '/api/public/jobs/auto-posts'
     | '/api/public/mpesa/callback'
+    | '/api/public/paystack/webhook'
+    | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -161,6 +183,8 @@ export interface FileRouteTypes {
     | '/events'
     | '/api/public/jobs/auto-posts'
     | '/api/public/mpesa/callback'
+    | '/api/public/paystack/webhook'
+    | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
     | '/'
@@ -176,6 +200,8 @@ export interface FileRouteTypes {
     | '/events/'
     | '/api/public/jobs/auto-posts'
     | '/api/public/mpesa/callback'
+    | '/api/public/paystack/webhook'
+    | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -191,6 +217,8 @@ export interface RootRouteChildren {
   EventsIndexRoute: typeof EventsIndexRoute
   ApiPublicJobsAutoPostsRoute: typeof ApiPublicJobsAutoPostsRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
+  ApiPublicPaystackWebhookRoute: typeof ApiPublicPaystackWebhookRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -286,6 +314,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMpesaCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/paystack/webhook': {
+      id: '/api/public/paystack/webhook'
+      path: '/api/public/paystack/webhook'
+      fullPath: '/api/public/paystack/webhook'
+      preLoaderRoute: typeof ApiPublicPaystackWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -313,6 +355,8 @@ const rootRouteChildren: RootRouteChildren = {
   EventsIndexRoute: EventsIndexRoute,
   ApiPublicJobsAutoPostsRoute: ApiPublicJobsAutoPostsRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
+  ApiPublicPaystackWebhookRoute: ApiPublicPaystackWebhookRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
