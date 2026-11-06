@@ -9,3 +9,5 @@
 - [ ] Add Paystack checkout alongside M-Pesa and verify payment callbacks before issuing tickets
 - [ ] Add buyer email and WhatsApp ticket delivery with safe delivery tracking
 - [ ] Clarify whether to migrate this app from Lovable Cloud to the separately supplied database project; requires project keys and migration approval
+- [ ] Connect the supplied external database project before continuing the new-workspace WhatsApp setup; URL alone is insufficient
+- [ ] Connect WhatsApp Business in the new workspace after the database decision
