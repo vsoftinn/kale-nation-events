@@ -1,79 +1,176 @@
-// Safaricom Daraja (M-Pesa Express / STK Push). Server-only.
-const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"; // public Daraja sandbox passkey
+import { randomBytes } from "node:crypto";
 
-function cfg() {
-  const env = (process.env["MPESA_ENV"] || "sandbox").toLowerCase();
-  const key = process.env["MPESA_CONSUMER_KEY"];
-  const secret = process.env["MPESA_CONSUMER_SECRET"];
-  if (!key || !secret) throw new Error("M-Pesa is not configured yet (consumer key/secret missing).");
+type MpesaConfig = {
+  base: string;
+  key: string;
+  secret: string;
+  shortcode: string;
+  passkey: string;
+  callback: string;
+  transactionType: "CustomerPayBillOnline" | "CustomerBuyGoodsOnline";
+};
+
+function config(): MpesaConfig {
+  const environment = (process.env["MPESA_ENVIRONMENT"] || process.env["MPESA_ENV"] || "sandbox")
+    .trim()
+    .toLowerCase();
+  const key = process.env["MPESA_CONSUMER_KEY"]?.trim();
+  const secret = process.env["MPESA_CONSUMER_SECRET"]?.trim();
+  const shortcode = process.env["MPESA_SHORTCODE"]?.trim();
+  const passkey = process.env["MPESA_PASSKEY"]?.trim();
+  const callback = process.env["MPESA_CALLBACK_URL"]?.trim();
+  const transactionType = process.env["MPESA_TRANSACTION_TYPE"]?.trim() || "CustomerPayBillOnline";
+
+  if (!key || !secret || !passkey) throw new Error("M-Pesa is not configured.");
+  if (environment !== "sandbox" && environment !== "production") {
+    throw new Error("MPESA_ENVIRONMENT must be sandbox or production.");
+  }
+  if (transactionType !== "CustomerPayBillOnline" && transactionType !== "CustomerBuyGoodsOnline") {
+    throw new Error("MPESA_TRANSACTION_TYPE is invalid.");
+  }
+  if (environment === "production" && (!shortcode || !passkey)) {
+    throw new Error("Production M-Pesa shortcode and passkey are required.");
+  }
+
+  const baseUrl = process.env["APP_BASE_URL"]?.trim() || "https://events.v-soft-innovations.com";
+  const callbackUrl = callback || `${baseUrl.replace(/\/+$/, "")}/api/public/mpesa/callback`;
+  if (!callbackUrl.startsWith("https://")) {
+    throw new Error("M-Pesa callback URL must use HTTPS.");
+  }
+
   return {
-    base: env === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke",
-    key, secret,
-    shortcode: process.env["MPESA_SHORTCODE"] || "174379",
-    passkey: process.env["MPESA_PASSKEY"] || SANDBOX_PASSKEY,
-    callback: process.env["MPESA_CALLBACK_URL"] || "https://kale-ticket-garden.lovable.app/api/public/mpesa/callback",
+    base:
+      environment === "production"
+        ? "https://api.safaricom.co.ke"
+        : "https://sandbox.safaricom.co.ke",
+    key,
+    secret,
+    shortcode: shortcode || "174379",
+    passkey,
+    callback: callbackUrl,
+    transactionType,
   };
 }
 
-/** 07xx / +2547xx / 2547xx / 01xx → 2547xxxxxxxx; null if invalid. */
+export function assertMpesaConfigured(): void {
+  config();
+}
+
 export function normalizePhone(raw: string): string | null {
-  const d = raw.replace(/\D/g, "");
-  const m = d.match(/^(?:254|0)?([17]\d{8})$/);
-  return m ? `254${m[1]}` : null;
+  const digits = raw.replace(/[\s()+-]/g, "");
+  const match = digits.match(/^(?:254|0)?([17]\d{8})$/);
+  return match ? `254${match[1]}` : null;
 }
 
-function nairobiTimestamp(now = new Date()) {
-  const t = new Date(now.getTime() + 3 * 3600_000);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${t.getUTCFullYear()}${p(t.getUTCMonth() + 1)}${p(t.getUTCDate())}${p(t.getUTCHours())}${p(t.getUTCMinutes())}${p(t.getUTCSeconds())}`;
+function nairobiTimestamp(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values["year"]}${values["month"]}${values["day"]}${values["hour"]}${values["minute"]}${values["second"]}`;
 }
 
-async function token(c: ReturnType<typeof cfg>) {
-  const r = await fetch(`${c.base}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${btoa(`${c.key}:${c.secret}`)}` },
+async function accessToken(settings: MpesaConfig): Promise<string> {
+  const credentials = Buffer.from(`${settings.key}:${settings.secret}`).toString("base64");
+  const response = await fetch(`${settings.base}/oauth/v1/generate?grant_type=client_credentials`, {
+    headers: { Authorization: `Basic ${credentials}` },
+    signal: AbortSignal.timeout(15_000),
   });
-  if (!r.ok) throw new Error(`M-Pesa auth failed (${r.status})`);
-  return ((await r.json()) as { access_token: string }).access_token;
+  if (!response.ok) throw new Error("Could not authenticate with M-Pesa.");
+  const result = (await response.json()) as { access_token?: string };
+  if (!result.access_token) throw new Error("M-Pesa did not provide an access token.");
+  return result.access_token;
 }
 
-export async function stkPush(o: { phone: string; amount: number; reference: string; desc: string }) {
-  const c = cfg();
-  const ts = nairobiTimestamp();
-  const r = await fetch(`${c.base}/mpesa/stkpush/v1/processrequest`, {
+async function request<T>(settings: MpesaConfig, path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${settings.base}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${await token(c)}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      BusinessShortCode: c.shortcode,
-      Password: btoa(`${c.shortcode}${c.passkey}${ts}`),
-      Timestamp: ts,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: Math.round(o.amount),
-      PartyA: o.phone,
-      PartyB: c.shortcode,
-      PhoneNumber: o.phone,
-      CallBackURL: c.callback,
-      AccountReference: o.reference.slice(0, 12),
-      TransactionDesc: o.desc.slice(0, 13),
-    }),
+    headers: {
+      Authorization: `Bearer ${await accessToken(settings)}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
-  const j = (await r.json()) as { ResponseCode?: string; CheckoutRequestID?: string; errorMessage?: string; ResponseDescription?: string };
-  if (j.ResponseCode !== "0" || !j.CheckoutRequestID) throw new Error(j.errorMessage || j.ResponseDescription || "M-Pesa request failed");
-  return j.CheckoutRequestID;
+  const result = (await response.json()) as T & {
+    errorCode?: string;
+    errorMessage?: string;
+    ResponseCode?: string;
+    ResponseDescription?: string;
+  };
+  if (!response.ok || result.errorCode) {
+    throw new Error(result.errorMessage || "M-Pesa request failed.");
+  }
+  return result;
 }
 
-/** Ask Safaricom for the result (used when the callback hasn't arrived). */
-export async function stkQuery(checkoutId: string): Promise<{ done: boolean; ok: boolean; desc: string }> {
-  const c = cfg();
-  const ts = nairobiTimestamp();
-  const r = await fetch(`${c.base}/mpesa/stkpushquery/v1/query`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${await token(c)}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ BusinessShortCode: c.shortcode, Password: btoa(`${c.shortcode}${c.passkey}${ts}`), Timestamp: ts, CheckoutRequestID: checkoutId }),
+export async function stkPush(order: {
+  phone: string;
+  amount: number;
+  reference: string;
+  desc: string;
+}): Promise<string> {
+  if (!Number.isSafeInteger(order.amount) || order.amount < 1) {
+    throw new Error("M-Pesa requires a positive whole-shilling amount.");
+  }
+  const settings = config();
+  const timestamp = nairobiTimestamp();
+  const result = await request<{
+    ResponseCode?: string;
+    ResponseDescription?: string;
+    CheckoutRequestID?: string;
+  }>(settings, "/mpesa/stkpush/v1/processrequest", {
+    BusinessShortCode: settings.shortcode,
+    Password: Buffer.from(`${settings.shortcode}${settings.passkey}${timestamp}`).toString(
+      "base64",
+    ),
+    Timestamp: timestamp,
+    TransactionType: settings.transactionType,
+    Amount: order.amount,
+    PartyA: order.phone,
+    PartyB: settings.shortcode,
+    PhoneNumber: order.phone,
+    CallBackURL: settings.callback,
+    AccountReference: order.reference.slice(0, 12),
+    TransactionDesc: order.desc.slice(0, 13),
   });
-  const j = (await r.json()) as { ResultCode?: string; ResultDesc?: string; errorCode?: string };
-  if (j.ResultCode === undefined) return { done: false, ok: false, desc: "Waiting" }; // still processing
-  return { done: true, ok: j.ResultCode === "0", desc: j.ResultDesc ?? "" };
+  if (result.ResponseCode !== "0" || !result.CheckoutRequestID) {
+    throw new Error(result.ResponseDescription || "M-Pesa did not accept the STK Push.");
+  }
+  return result.CheckoutRequestID;
 }
 
-export const ticketCode = () =>
-  `KN-${Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("")}`;
+export async function stkQuery(
+  checkoutId: string,
+): Promise<{ done: boolean; ok: boolean; desc: string }> {
+  const settings = config();
+  const timestamp = nairobiTimestamp();
+  const result = await request<{
+    ResultCode?: string | number;
+    ResultDesc?: string;
+  }>(settings, "/mpesa/stkpushquery/v1/query", {
+    BusinessShortCode: settings.shortcode,
+    Password: Buffer.from(`${settings.shortcode}${settings.passkey}${timestamp}`).toString(
+      "base64",
+    ),
+    Timestamp: timestamp,
+    CheckoutRequestID: checkoutId,
+  });
+  if (result.ResultCode === undefined) {
+    return { done: false, ok: false, desc: "Waiting for M-Pesa confirmation." };
+  }
+  return {
+    done: true,
+    ok: String(result.ResultCode) === "0",
+    desc: result.ResultDesc ?? "",
+  };
+}
+
+export const ticketCode = (): string => `KN-${randomBytes(12).toString("hex").toUpperCase()}`;

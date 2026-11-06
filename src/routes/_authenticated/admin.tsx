@@ -2,7 +2,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { mapPost, mapProgram, PROGRAM_SELECT, imageKeys, slugify, type EventItem, type Program } from "@/lib/catalog";
 import { activePhase, ksh, statusLabel, tierStatus, type TicketTier } from "@/lib/pricing";
@@ -90,11 +90,16 @@ function Admin() {
   );
 }
 
-function useAdminPrograms() {
+function useAdminPrograms(programIds?: string[]) {
   return useQuery({
-    queryKey: ["admin-programs"],
+    queryKey: ["admin-programs", programIds ?? "all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("programs").select(PROGRAM_SELECT).order("created_at");
+      let query = supabase.from("programs").select(PROGRAM_SELECT).order("created_at");
+      if (programIds) {
+        if (!programIds.length) return [];
+        query = query.in("id", programIds);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []).map(mapProgram);
     },
@@ -104,33 +109,94 @@ function useAdminPrograms() {
 function useWrite() {
   const qc = useQueryClient();
   const [error, setError] = useState("");
-  const run = async (p: PromiseLike<{ error: { message: string } | null }>) => {
-    const { error } = await p;
-    setError(error?.message ?? "");
-    qc.invalidateQueries({ queryKey: ["admin-programs"] });
-    qc.invalidateQueries({ queryKey: ["programs"] });
+  const [success, setSuccess] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("");
+  const run = async (
+    operation: () => PromiseLike<{ error: { message: string } | null } | void>,
+    label = "Saving changes…",
+  ) => {
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    setBusyLabel(label);
+    try {
+      const result = await operation();
+      if (result?.error) throw new Error(result.error.message);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin-programs"] }),
+        qc.invalidateQueries({ queryKey: ["programs"] }),
+        qc.invalidateQueries({ queryKey: ["event"] }),
+      ]);
+      setSuccess("Changes saved.");
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save changes.");
+      return false;
+    } finally {
+      setBusy(false);
+      setBusyLabel("");
+    }
   };
-  return { run, error };
+  return { run, error, success, busy, busyLabel };
 }
 
 function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: string[] }) {
-  const { data: all } = useAdminPrograms();
-  const programs = (all ?? []).filter((p) => isSuper || programIds.includes(p.id));
+  const { data: all } = useAdminPrograms(isSuper ? undefined : programIds);
+  const programs = all ?? [];
   const [sel, setSel] = useState<string | null>(null);
+  const [focusEventId, setFocusEventId] = useState<string | null>(null);
   const program = programs.find((p) => p.id === sel) ?? programs[0];
-  const { run, error } = useWrite();
+  const { run, error, success, busy, busyLabel } = useWrite();
+  useEffect(() => {
+    if (!focusEventId) return;
+    document.getElementById(`admin-event-${focusEventId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => setFocusEventId(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [focusEventId, all]);
   if (!program) return <p className="text-muted-foreground">No programs.</p>;
 
   const tiers = program.events.flatMap((e) => e.tiers);
   const sold = tiers.reduce((s, t) => s + t.sold, 0);
-  const revenue = tiers.reduce((s, t) => s + t.sold * (activePhase(t)?.price ?? 0), 0);
+  const revenue = isSuper ? tiers.reduce((s, t) => s + t.sold * (activePhase(t)?.price ?? 0), 0) : null;
 
   const addEvent = async () => {
     const date = new Date(Date.now() + 30 * 864e5);
-    const { data: ev, error } = await supabase.from("events").insert({ program_id: program.id, title: `New ${program.name} event`, date: date.toISOString(), published: false }).select().single();
-    if (error || !ev) return run(Promise.resolve({ error }));
-    const { data: t } = await supabase.from("ticket_tiers").insert({ event_id: ev.id, name: "Regular", quantity: 500, sales_end_at: date.toISOString() }).select().single();
-    await run(supabase.from("price_phases").insert({ tier_id: t!.id, label: "Early Bird", price: 1000, starts_at: new Date().toISOString() }));
+    let createdEventId: string | null = null;
+    const created = await run(async () => {
+      const { data: ev, error: eventError } = await supabase
+        .from("events")
+        .insert({ program_id: program.id, title: `New ${program.name} event`, date: date.toISOString(), published: false })
+        .select()
+        .single();
+      if (eventError) throw eventError;
+      if (!ev) throw new Error("The event was not created.");
+      createdEventId = ev.id;
+
+      const { data: tier, error: tierError } = await supabase
+        .from("ticket_tiers")
+        .insert({ event_id: ev.id, name: "Regular", quantity: 500, sales_end_at: date.toISOString() })
+        .select()
+        .single();
+      if (tierError || !tier) {
+        const cleanup = await supabase.from("events").delete().eq("id", ev.id);
+        if (cleanup.error) throw new Error(`${tierError?.message ?? "Could not create the default ticket."} Cleanup failed: ${cleanup.error.message}`);
+        throw new Error(tierError?.message ?? "Could not create the default ticket.");
+      }
+
+      const { error: phaseError } = await supabase.from("price_phases").insert({
+        tier_id: tier.id,
+        label: "Early Bird",
+        price: 1000,
+        starts_at: new Date().toISOString(),
+      });
+      if (phaseError) {
+        const cleanup = await supabase.from("events").delete().eq("id", ev.id);
+        if (cleanup.error) throw new Error(`${phaseError.message} Cleanup failed: ${cleanup.error.message}`);
+        throw phaseError;
+      }
+    }, "Creating event…");
+    if (created && createdEventId) setFocusEventId(createdEventId);
   };
 
   return (
@@ -145,34 +211,87 @@ function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: stri
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h1 className="text-6xl">{program.name}</h1>
-          <button onClick={addEvent} className={btn}>+ Post event</button>
+          <button type="button" onClick={addEvent} disabled={busy} className={btn}>
+            {busyLabel === "Creating event…" ? <Working label={busyLabel} /> : "+ Post event"}
+          </button>
         </div>
         {error && <p className="text-destructive">{error}</p>}
+        {!error && success && <p role="status" aria-live="polite" className="text-sm text-primary">{success}</p>}
         <div className="grid gap-4 sm:grid-cols-3">
-          {[["Tickets sold", sold.toLocaleString()], ["Est. revenue", ksh(revenue)], ["Events", String(program.events.length)]].map(([k, v]) => (
+          {[
+            ["Tickets sold", sold.toLocaleString()],
+            ...(revenue === null ? [] : [["Est. revenue", ksh(revenue)]]),
+            ["Events", String(program.events.length)],
+          ].map(([k, v]) => (
             <div key={k} className="rounded-xl border border-border bg-card p-5">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">{k}</p>
               <p className="font-display text-4xl text-primary">{v}</p>
             </div>
           ))}
         </div>
-        {program.events.map((ev) => <EventEditor key={ev.id} ev={ev} run={run} />)}
+        {program.events.map((ev) => (
+          <EventEditor key={ev.id} ev={ev} run={run} busy={busy} busyLabel={busyLabel} focus={focusEventId === ev.id} />
+        ))}
       </div>
     </div>
   );
 }
 
-type Run = (p: PromiseLike<{ error: { message: string } | null }>) => Promise<void>;
-
-function EventEditor({ ev, run }: { ev: EventItem; run: Run }) {
-  const upd = (patch: any) => run(supabase.from("events").update(patch).eq("id", ev.id));
+function Working({ label }: { label: string }) {
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-card p-6">
+    <span role="status" className="inline-flex items-center gap-2 normal-case tracking-normal">
+      <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      {label}
+    </span>
+  );
+}
+
+type Run = (
+  operation: () => PromiseLike<{ error: { message: string } | null } | void>,
+  label?: string,
+) => Promise<boolean>;
+
+function EventEditor({ ev, run, busy, busyLabel, focus }: { ev: EventItem; run: Run; busy: boolean; busyLabel: string; focus: boolean }) {
+  const [newTierId, setNewTierId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!newTierId) return;
+    document.getElementById(`admin-tier-${newTierId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => setNewTierId(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [newTierId, ev]);
+  const upd = (patch: any) => run(() => supabase.from("events").update(patch).eq("id", ev.id));
+  const addTicketType = async () => {
+    let createdTierId: string | null = null;
+    const created = await run(async () => {
+      const { data: tier, error: tierError } = await supabase
+        .from("ticket_tiers")
+        .insert({ event_id: ev.id, name: "New ticket", quantity: 100, sales_end_at: ev.date })
+        .select()
+        .single();
+      if (tierError) throw tierError;
+      if (!tier) throw new Error("The ticket type was not created.");
+      createdTierId = tier.id;
+      const { error: phaseError } = await supabase.from("price_phases").insert({
+        tier_id: tier.id,
+        label: "Standard",
+        price: 1000,
+        starts_at: new Date().toISOString(),
+      });
+      if (phaseError) {
+        const cleanup = await supabase.from("ticket_tiers").delete().eq("id", tier.id);
+        if (cleanup.error) throw new Error(`${phaseError.message} Cleanup failed: ${cleanup.error.message}`);
+        throw phaseError;
+      }
+    }, "Adding ticket type…");
+    if (created && createdTierId) setNewTierId(createdTierId);
+  };
+  return (
+    <div id={`admin-event-${ev.id}`} className={`space-y-4 rounded-xl border bg-card p-6 ${focus ? "animate-rise border-primary shadow-glow" : "border-border"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={`rounded-full px-2 py-0.5 text-xs uppercase ${ev.published ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{ev.published ? "Live" : "Draft"}</span>
         <div className="flex gap-2">
-          <button onClick={() => upd({ published: !ev.published })} className="rounded-md border border-border px-3 py-1 text-sm">{ev.published ? "Unpublish" : "Publish"}</button>
-          <button onClick={() => confirm("Delete this event and its tickets?") && run(supabase.from("events").delete().eq("id", ev.id))} className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive">Delete</button>
+          <button type="button" onClick={() => upd({ published: !ev.published })} className="rounded-md border border-border px-3 py-1 text-sm">{ev.published ? "Unpublish" : "Publish"}</button>
+          <button type="button" onClick={() => confirm("Delete this event and its tickets?") && run(() => supabase.from("events").delete().eq("id", ev.id))} className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive">Delete</button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-4">
@@ -183,21 +302,42 @@ function EventEditor({ ev, run }: { ev: EventItem; run: Run }) {
         <label className="text-xs text-muted-foreground sm:col-span-2">Lineup (comma separated)<input className={inp} defaultValue={ev.lineup.join(", ")} onBlur={(e) => upd({ lineup: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} /></label>
         <label className="text-xs text-muted-foreground sm:col-span-4">Description<textarea rows={2} className={inp} defaultValue={ev.description} onBlur={(e) => upd({ description: e.target.value })} /></label>
       </div>
-      {ev.tiers.map((t) => <TierEditor key={t.id} t={t} run={run} />)}
-      <button className="text-sm font-semibold text-primary" onClick={async () => {
-        const { data: t } = await supabase.from("ticket_tiers").insert({ event_id: ev.id, name: "New ticket", quantity: 100, sales_end_at: ev.date }).select().single();
-        if (t) await run(supabase.from("price_phases").insert({ tier_id: t.id, label: "Standard", price: 1000, starts_at: new Date().toISOString() }));
-      }}>+ Add ticket type</button>
+      {ev.tiers.map((t) => <TierEditor key={t.id} t={t} run={run} busy={busy} busyLabel={busyLabel} focus={newTierId === t.id} />)}
+      <button type="button" disabled={busy} className="text-sm font-semibold text-primary disabled:opacity-50" onClick={addTicketType}>
+        {busyLabel === "Adding ticket type…" ? <Working label={busyLabel} /> : "+ Add ticket type"}
+      </button>
     </div>
   );
 }
 
-function TierEditor({ t, run }: { t: TicketTier; run: Run }) {
+function TierEditor({ t, run, busy, busyLabel, focus }: { t: TicketTier; run: Run; busy: boolean; busyLabel: string; focus: boolean }) {
   const s = tierStatus(t);
-  const upd = (patch: any) => run(supabase.from("ticket_tiers").update(patch).eq("id", t.id));
-  const updPh = (id: string, patch: any) => run(supabase.from("price_phases").update(patch).eq("id", id));
+  const [newPhaseId, setNewPhaseId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!newPhaseId) return;
+    document.getElementById(`admin-phase-${newPhaseId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => setNewPhaseId(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [newPhaseId, t]);
+  const upd = (patch: any) => run(() => supabase.from("ticket_tiers").update(patch).eq("id", t.id));
+  const updPh = (id: string, patch: any) => run(() => supabase.from("price_phases").update(patch).eq("id", id));
+  const addPriceChange = async () => {
+    let createdPhaseId: string | null = null;
+    const created = await run(async () => {
+      const { data: phase, error: phaseError } = await supabase.from("price_phases").insert({
+        tier_id: t.id,
+        label: "New phase",
+        price: (t.phases.at(-1)?.price ?? 1000) + 500,
+        starts_at: new Date(Date.now() + 7 * 864e5).toISOString(),
+      }).select().single();
+      if (phaseError) throw phaseError;
+      if (!phase) throw new Error("The price change was not created.");
+      createdPhaseId = phase.id;
+    }, "Adding price change…");
+    if (created && createdPhaseId) setNewPhaseId(createdPhaseId);
+  };
   return (
-    <div className="rounded-lg border border-border bg-background p-4">
+    <div id={`admin-tier-${t.id}`} className={`rounded-lg border bg-background p-4 ${focus ? "animate-rise border-primary shadow-glow" : "border-border"}`}>
       <div className="flex flex-wrap items-center gap-3">
         <input className={`${inp} max-w-[160px] font-semibold`} defaultValue={t.name} onBlur={(e) => upd({ name: e.target.value })} />
         <span className="rounded-full bg-secondary px-2 py-0.5 text-xs uppercase">{statusLabel[s]}</span>
@@ -208,22 +348,22 @@ function TierEditor({ t, run }: { t: TicketTier; run: Run }) {
         <label className="flex items-center gap-2 text-xs text-muted-foreground">Qty
           <input type="number" min={0} className={`${inp} w-24`} defaultValue={t.quantity} onBlur={(e) => upd({ quantity: Math.max(0, +e.target.value) })} />
         </label>
-        <button onClick={() => upd({ closed: !t.closed })} className={`rounded-md px-3 py-1 text-xs font-bold uppercase ${t.closed ? "bg-primary text-primary-foreground" : "border border-destructive text-destructive"}`}>{t.closed ? "Reopen sales" : "Close sales"}</button>
-        <button onClick={() => confirm("Delete this ticket type?") && run(supabase.from("ticket_tiers").delete().eq("id", t.id))} className="px-2 text-destructive">✕</button>
+        <button type="button" onClick={() => upd({ closed: !t.closed })} className={`rounded-md px-3 py-1 text-xs font-bold uppercase ${t.closed ? "bg-primary text-primary-foreground" : "border border-destructive text-destructive"}`}>{t.closed ? "Reopen sales" : "Close sales"}</button>
+        <button type="button" onClick={() => confirm("Delete this ticket type?") && run(() => supabase.from("ticket_tiers").delete().eq("id", t.id))} className="px-2 text-destructive">✕</button>
       </div>
       <p className="mt-4 text-xs uppercase tracking-widest text-muted-foreground">⚡ Automatic price schedule</p>
       <div className="mt-2 space-y-2">
         {t.phases.map((ph) => (
-          <div key={ph.id} className="grid grid-cols-[1fr_120px_1fr_auto] items-center gap-2">
+          <div id={`admin-phase-${ph.id}`} key={ph.id} className={`grid grid-cols-[1fr_120px_1fr_auto] items-center gap-2 rounded-md ${newPhaseId === ph.id ? "animate-rise ring-1 ring-primary" : ""}`}>
             <input className={inp} defaultValue={ph.label} onBlur={(e) => updPh(ph.id!, { label: e.target.value })} />
             <input type="number" min={0} className={inp} defaultValue={ph.price} onBlur={(e) => updPh(ph.id!, { price: Math.max(0, Math.round(+e.target.value)) })} />
             <input type="datetime-local" className={inp} defaultValue={toLocal(ph.startsAt)} onBlur={(e) => e.target.value && updPh(ph.id!, { starts_at: fromLocal(e.target.value) })} />
-            <button className="px-2 text-destructive" onClick={() => run(supabase.from("price_phases").delete().eq("id", ph.id!))}>✕</button>
+            <button type="button" className="px-2 text-destructive" onClick={() => run(() => supabase.from("price_phases").delete().eq("id", ph.id!))}>✕</button>
           </div>
         ))}
-        <button className="text-sm font-semibold text-primary" onClick={() => run(supabase.from("price_phases").insert({
-          tier_id: t.id, label: "New phase", price: (t.phases.at(-1)?.price ?? 1000) + 500, starts_at: new Date(Date.now() + 7 * 864e5).toISOString(),
-        }))}>+ Add price change</button>
+        <button type="button" disabled={busy} className="text-sm font-semibold text-primary disabled:opacity-50" onClick={addPriceChange}>
+          {busyLabel === "Adding price change…" ? <Working label={busyLabel} /> : "+ Add price change"}
+        </button>
       </div>
     </div>
   );
@@ -375,7 +515,7 @@ function ApplicationsTab() {
             <h3 className="text-2xl">{a.name}{a.organization && ` · ${a.organization}`}</h3>
             <span className="rounded-full bg-secondary px-2 text-xs uppercase">{a.status}</span>
           </div>
-          <p className="text-sm text-muted-foreground">{a.email} · {a.phone} · {a.event_type} · {new Date(a.created_at).toLocaleDateString()}</p>
+          <p className="text-sm text-muted-foreground">{a.email} · {a.phone} · {a.event_type} · {new Date(a.created_at).toLocaleDateString("en-KE", { timeZone: "Africa/Nairobi" })}</p>
           {a.message && <p className="mt-2 text-sm">{a.message}</p>}
           <div className="mt-3 flex gap-2">
             <button onClick={() => set(a.id, "approved")} className={btn}>Approve</button>
@@ -390,14 +530,16 @@ function ApplicationsTab() {
 
 function ProgramsTab() {
   const { data: programs } = useAdminPrograms();
-  const { run, error } = useWrite();
+  const { run, error, success, busy, busyLabel } = useWrite();
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
     const name = String(f.get("name")).trim();
-    await run(supabase.from("programs").insert({ name, slug: slugify(name), owner: String(f.get("owner")), tagline: String(f.get("tagline")), image_key: String(f.get("image")) }));
-    form.reset();
+    if (await run(
+      () => supabase.from("programs").insert({ name, slug: slugify(name), owner: String(f.get("owner")), tagline: String(f.get("tagline")), image_key: String(f.get("image")) }),
+      "Adding program…",
+    )) form.reset();
   }
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -407,15 +549,16 @@ function ProgramsTab() {
         <input name="owner" placeholder="Owner / organizer" className={inp} maxLength={120} />
         <input name="tagline" placeholder="Tagline" className={inp} maxLength={200} />
         <select name="image" className={inp}>{imageKeys.map((k) => <option key={k}>{k}</option>)}</select>
-        <button className={btn}>Add program</button>
+        <button type="submit" disabled={busy} className={btn}>{busy ? <Working label={busyLabel} /> : "Add program"}</button>
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {!error && success && <p role="status" aria-live="polite" className="text-sm text-primary">{success}</p>}
       </form>
       <div className="space-y-2">
         <h2 className="text-3xl">Programs</h2>
         {(programs ?? []).map((p) => (
           <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
             <span><b>{p.name}</b> · {p.owner} · {p.events.length} events</span>
-            <button onClick={() => confirm(`Delete ${p.name} and all its events?`) && run(supabase.from("programs").delete().eq("id", p.id))} className="text-xs text-destructive underline">Delete</button>
+            <button type="button" onClick={() => confirm(`Delete ${p.name} and all its events?`) && run(() => supabase.from("programs").delete().eq("id", p.id))} className="text-xs text-destructive underline">Delete</button>
           </div>
         ))}
       </div>

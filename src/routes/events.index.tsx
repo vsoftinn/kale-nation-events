@@ -3,7 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getPrograms } from "@/lib/public.functions";
 import { imageFor } from "@/lib/catalog";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { activePhase, ksh } from "@/lib/pricing";
+import { activePhase, allTicketsSold, ksh } from "@/lib/pricing";
 
 export const programsQuery = queryOptions({ queryKey: ["programs"], queryFn: () => getPrograms(), staleTime: 30_000 });
 
@@ -44,7 +44,11 @@ function EventsPage() {
                   <p className="text-xs uppercase tracking-widest text-muted-foreground">{p.name}</p>
                   <h2 className="mt-1 text-4xl">{e.title}</h2>
                   <p className="text-sm">{new Date(e.date).toDateString()} · {e.venue}, {e.city}</p>
-                  <p className="mt-4 font-bold uppercase tracking-wider text-primary">{Number.isFinite(from) ? `Tickets from ${ksh(from)}` : "Tickets"} →</p>
+                  {allTicketsSold(e.tiers) ? (
+                    <p className="mt-4 font-bold uppercase tracking-wider text-destructive">All tickets are sold</p>
+                  ) : (
+                    <p className="mt-4 font-bold uppercase tracking-wider text-primary">{Number.isFinite(from) ? `Tickets from ${ksh(from)}` : "Tickets"} →</p>
+                  )}
                 </div>
               </Link>
             );

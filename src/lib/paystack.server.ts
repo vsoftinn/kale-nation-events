@@ -1,42 +1,116 @@
-// Paystack (cards, M-Pesa via Paystack, bank). Server-only.
-function key() {
-  const k = process.env["PAYSTACK_SECRET_KEY"];
-  if (!k) throw new Error("Paystack is not configured yet.");
-  return k;
+function secretKey(): string {
+  const secret = process.env["PAYSTACK_SECRET_KEY"]?.trim();
+  if (!secret) throw new Error("Paystack is not configured.");
+  return secret;
 }
 
-export async function paystackInit(o: { email: string; amount: number; reference: string; callbackUrl: string; metadata?: Record<string, unknown> }) {
-  const r = await fetch("https://api.paystack.co/transaction/initialize", {
+export function assertPaystackConfigured(): void {
+  secretKey();
+}
+
+export async function paystackInit(input: {
+  email: string;
+  amount: number;
+  reference: string;
+  callbackUrl: string;
+  metadata?: Record<string, unknown>;
+}): Promise<string> {
+  if (!Number.isSafeInteger(input.amount) || input.amount < 1) {
+    throw new Error("Paystack requires a positive whole-shilling amount.");
+  }
+  const response = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
-    headers: { Authorization: `Bearer ${key()}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${secretKey()}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      email: o.email, amount: Math.round(o.amount * 100), currency: "KES",
-      reference: o.reference, callback_url: o.callbackUrl, metadata: o.metadata,
+      email: input.email,
+      amount: input.amount * 100,
+      currency: "KES",
+      reference: input.reference,
+      callback_url: input.callbackUrl,
+      metadata: input.metadata,
     }),
+    signal: AbortSignal.timeout(15_000),
   });
-  const j = (await r.json()) as { status?: boolean; message?: string; data?: { authorization_url: string } };
-  if (!r.ok || !j.status || !j.data) throw new Error(`Paystack: ${j.message ?? r.status}`);
-  return j.data.authorization_url;
+  const result = (await response.json()) as {
+    status?: boolean;
+    data?: { authorization_url?: string };
+  };
+  const authorizationUrl = result.data?.authorization_url;
+  if (!response.ok || !result.status || !authorizationUrl?.startsWith("https://")) {
+    throw new Error("Paystack did not provide a valid checkout link.");
+  }
+  return authorizationUrl;
 }
 
-export async function paystackVerify(reference: string): Promise<{ done: boolean; ok: boolean; amount: number; desc: string }> {
-  const r = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-    headers: { Authorization: `Bearer ${key()}` },
-  });
-  const j = (await r.json()) as { data?: { status: string; amount: number; currency: string; gateway_response?: string } };
-  const s = j.data?.status;
-  if (!s || s === "ongoing" || s === "pending" || s === "abandoned") return { done: false, ok: false, amount: 0, desc: "Waiting" };
-  return { done: true, ok: s === "success" && j.data!.currency === "KES", amount: j.data!.amount / 100, desc: j.data!.gateway_response ?? s };
+export async function paystackVerify(reference: string): Promise<{
+  done: boolean;
+  ok: boolean;
+  amountSubunits: number;
+  currency: string | null;
+  desc: string;
+}> {
+  const response = await fetch(
+    `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+    {
+      headers: { Authorization: `Bearer ${secretKey()}` },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  const result = (await response.json()) as {
+    status?: boolean;
+    data?: {
+      status?: string;
+      amount?: number;
+      currency?: string;
+      reference?: string;
+      gateway_response?: string;
+    };
+  };
+  const transaction = result.data;
+  if (!response.ok || !result.status || !transaction) {
+    throw new Error("Could not verify the Paystack transaction.");
+  }
+  if (transaction.reference !== reference) {
+    throw new Error("Paystack returned a different transaction reference.");
+  }
+  const state = transaction.status;
+  if (!state || ["ongoing", "pending", "abandoned"].includes(state)) {
+    return {
+      done: false,
+      ok: false,
+      amountSubunits: 0,
+      currency: transaction.currency ?? null,
+      desc: "Waiting for Paystack confirmation.",
+    };
+  }
+  return {
+    done: true,
+    ok: state === "success",
+    amountSubunits: transaction.amount ?? 0,
+    currency: transaction.currency ?? null,
+    desc: transaction.gateway_response ?? state,
+  };
 }
 
-/** Paystack signs webhooks with HMAC-SHA512 of the raw body using the secret key. */
-export async function paystackSignatureOk(raw: string, sig: string | null) {
-  if (!sig) return false;
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key()), { name: "HMAC", hash: "SHA-512" }, false, ["sign"]);
-  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(raw)));
-  const hex = Array.from(mac, (b) => b.toString(16).padStart(2, "0")).join("");
-  if (hex.length !== sig.length) return false;
-  let diff = 0;
-  for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ sig.charCodeAt(i);
-  return diff === 0;
+export async function paystackSignatureOk(raw: string, signature: string | null): Promise<boolean> {
+  if (!signature || !/^[a-f0-9]{128}$/i.test(signature)) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secretKey()),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw)),
+  );
+  const expected = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ signature.toLowerCase().charCodeAt(index);
+  }
+  return mismatch === 0;
 }

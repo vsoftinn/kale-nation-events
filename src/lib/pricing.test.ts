@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activePhase, tierStatus, type TicketTier } from "./pricing";
+import { activePhase, allTicketsSold, tierStatus, type TicketTier } from "./pricing";
 
 const tier: TicketTier = {
   id: "t",
@@ -32,6 +32,14 @@ describe("ticket pricing", () => {
 describe("admin closing tickets", () => {
   it("a closed tier cannot be bought even while on sale", () => {
     expect(tierStatus({ ...tier, closed: true }, new Date("2026-01-15"))).toBe("closed");
+  });
+  it("reports all tickets sold when every tier is sold out or closed", () => {
+    const now = new Date("2026-01-15");
+    expect(allTicketsSold([{ ...tier, sold: 10 }, { ...tier, closed: true }], now)).toBe(true);
+    expect(allTicketsSold([{ ...tier, sold: 10 }, tier], now)).toBe(false);
+    expect(allTicketsSold([{ ...tier, salesEndAt: "2025-12-01T00:00:00Z" }], now)).toBe(false);
+    expect(allTicketsSold([{ ...tier, phases: [{ label: "Later", price: 1000, startsAt: "2026-02-01T00:00:00Z" }] }], now)).toBe(false);
+    expect(allTicketsSold([], now)).toBe(false);
   });
 });
 
