@@ -9,7 +9,7 @@ ALTER TABLE public.ticket_orders
   ADD COLUMN IF NOT EXISTS email_status text;
 CREATE INDEX IF NOT EXISTS ticket_orders_wa_msg ON public.ticket_orders(whatsapp_message_id);
 
-CREATE TABLE IF NOT EXISTS public.whatsapp_webhook_events (
+CREATE TABLE public.whatsapp_webhook_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   delivery_id text NOT NULL UNIQUE,
   event text NOT NULL,
@@ -21,17 +21,5 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_webhook_events (
 GRANT SELECT ON public.whatsapp_webhook_events TO authenticated;
 GRANT ALL ON public.whatsapp_webhook_events TO service_role;
 ALTER TABLE public.whatsapp_webhook_events ENABLE ROW LEVEL SECURITY;
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-      FROM pg_policies
-     WHERE schemaname = 'public'
-       AND tablename = 'whatsapp_webhook_events'
-       AND policyname = 'Superadmins read whatsapp events'
-  ) THEN
-    CREATE POLICY "Superadmins read whatsapp events" ON public.whatsapp_webhook_events
-      FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'superadmin'));
-  END IF;
-END;
-$$;
+CREATE POLICY "Superadmins read whatsapp events" ON public.whatsapp_webhook_events
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'superadmin'));

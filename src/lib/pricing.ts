@@ -34,13 +34,6 @@ export function tierStatus(tier: TicketTier, now: Date = new Date()): TierStatus
   return "on-sale";
 }
 
-export function allTicketsSold(tiers: TicketTier[], now: Date = new Date()): boolean {
-  return tiers.length > 0 && tiers.every((tier) => {
-    const status = tierStatus(tier, now);
-    return status === "sold-out" || status === "closed";
-  });
-}
-
 export const statusLabel: Record<TierStatus, string> = {
   "on-sale": "On sale",
   upcoming: "Coming soon",

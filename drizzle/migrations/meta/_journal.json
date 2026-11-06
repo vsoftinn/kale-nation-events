@@ -22,13 +22,6 @@
       "when": 1793880103852,
       "tag": "0002_ticket_delivery_paystack",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1793892463000,
-      "tag": "0003_ticket_order_security",
-      "breakpoints": true
     }
   ]
 }

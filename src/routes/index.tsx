@@ -7,7 +7,6 @@ import { programsQuery } from "./events.index";
 import { postsQuery } from "./blog.index";
 import { imageFor } from "@/lib/catalog";
 import { RunnerBolt } from "@/components/Loader";
-import { allTicketsSold } from "@/lib/pricing";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -153,10 +152,9 @@ function Index() {
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{p.name}</p>
                       <h3 className="mt-1 text-3xl leading-tight">{e.title}</h3>
                       <p className="mt-1 truncate text-sm text-muted-foreground">{e.venue}, {e.city}</p>
-                      {allTicketsSold(e.tiers) && <p className="mt-3 text-xs font-bold uppercase tracking-wider text-destructive">All tickets are sold</p>}
                       <div className="mt-4 flex items-center justify-between text-sm font-bold uppercase tracking-wider">
                         <span className="text-muted-foreground transition-colors group-hover:text-foreground">Learn more</span>
-                        <span className={allTicketsSold(e.tiers) ? "text-muted-foreground" : "text-primary transition-transform duration-300 group-hover:translate-x-1"}>{allTicketsSold(e.tiers) ? "View event →" : "Buy tickets →"}</span>
+                        <span className="text-primary transition-transform duration-300 group-hover:translate-x-1">Buy tickets →</span>
                       </div>
                     </div>
                   </Link>

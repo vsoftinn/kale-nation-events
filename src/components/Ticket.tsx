@@ -22,11 +22,10 @@ export function Ticket({
           <div><p className="text-[10px] uppercase opacity-60">Date</p><p className="font-semibold">{d.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Nairobi" })}</p></div>
           <div><p className="text-[10px] uppercase opacity-60">Gate opens</p><p className="font-semibold">{d.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Nairobi" })}</p></div>
           <div><p className="text-[10px] uppercase opacity-60">Venue</p><p className="font-semibold">{event.venue}, {event.city}</p></div>
-          <div><p className="text-[10px] uppercase opacity-60">Ticket holder</p><p className="font-semibold">{holder}</p></div>
-          <div><p className="text-[10px] uppercase opacity-60">Ticket type</p><p className="font-semibold">{tierName}</p></div>
+          <div><p className="text-[10px] uppercase opacity-60">Holder</p><p className="font-semibold">{holder}</p></div>
         </div>
         <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-paper-foreground px-3 py-1 text-xs font-bold uppercase tracking-wider text-paper">
-          {ksh(price)}
+          {tierName} · {ksh(price)}
         </div>
       </div>
       {/* perforation */}
@@ -36,7 +35,7 @@ export function Ticket({
       </div>
       <div className="relative flex w-44 flex-col items-center justify-center gap-2 p-4">
         <QRCodeSVG value={`KALEE:${event.id}:${code}`} size={120} bgColor="transparent" fgColor="currentColor" level="H" />
-        <p className="break-all text-center font-mono text-[10px] tracking-widest">{code}</p>
+        <p className="font-mono text-[10px] tracking-widest">{code}</p>
         <p className="text-[9px] uppercase opacity-60">Scan at gate · single entry</p>
       </div>
     </div>
