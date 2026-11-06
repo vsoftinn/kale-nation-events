@@ -23,10 +23,13 @@ export async function paystackVerify(reference: string): Promise<{ done: boolean
   const r = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
     headers: { Authorization: `Bearer ${key()}` },
   });
+  if (!r.ok) throw new Error(`Paystack verification failed (${r.status})`);
   const j = (await r.json()) as { data?: { status: string; amount: number; currency: string; gateway_response?: string } };
   const s = j.data?.status;
   if (!s || s === "ongoing" || s === "pending" || s === "abandoned") return { done: false, ok: false, amount: 0, desc: "Waiting" };
-  return { done: true, ok: s === "success" && j.data!.currency === "KES", amount: j.data!.amount / 100, desc: j.data!.gateway_response ?? s };
+  const details = j.data;
+  if (!details) return { done: false, ok: false, amount: 0, desc: "Waiting" };
+  return { done: true, ok: s === "success" && details.currency === "KES", amount: details.amount / 100, desc: details.gateway_response ?? s };
 }
 
 /** Paystack signs webhooks with HMAC-SHA512 of the raw body using the secret key. */
