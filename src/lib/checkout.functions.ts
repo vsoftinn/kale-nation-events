@@ -3,6 +3,11 @@ import { z } from "zod";
 import { activePhase, orderTotal, tierStatus } from "./pricing";
 import { mapTier } from "./catalog";
 
+async function hashOrderAccessToken(token: string) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export const startCheckout = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
@@ -19,6 +24,8 @@ export const startCheckout = createServerFn({ method: "POST" })
     if (!phone) throw new Error("Enter a valid Safaricom number, e.g. 0712 345 678");
     const whatsapp = data.whatsapp.trim() ? normalizePhone(data.whatsapp) : null;
     if (data.whatsapp.trim() && !whatsapp) throw new Error("Enter a valid WhatsApp number, e.g. 0712 345 678");
+    const accessToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const accessHash = await hashOrderAccessToken(accessToken);
     const { data: row } = await supabaseAdmin.from("ticket_tiers").select("*, price_phases(*), events(id, title)").eq("id", data.tierId).maybeSingle();
     if (!row) throw new Error("Ticket not found");
     const tier = mapTier(row);
@@ -29,6 +36,7 @@ export const startCheckout = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin.from("ticket_orders").insert({
       event_id: row.event_id, tier_id: tier.id, tier_name: tier.name, quantity: qty, unit_price: phase.price, total,
       holder: data.holder, phone, email: data.email.trim().toLowerCase(), whatsapp, provider: data.provider,
+      ticket_access_hash: accessHash,
     }).select("id").single();
     if (error) throw new Error(error.message);
     try {
@@ -46,7 +54,7 @@ export const startCheckout = createServerFn({ method: "POST" })
         checkoutId = order.id;
       }
       await supabaseAdmin.from("ticket_orders").update({ checkout_request_id: checkoutId }).eq("id", order.id);
-      return { orderId: order.id, total, qty, paymentUrl };
+      return { orderId: order.id, total, qty, paymentUrl, accessToken };
     } catch (e) {
       await supabaseAdmin.from("ticket_orders").update({ status: "failed", result_desc: (e as Error).message }).eq("id", order.id);
       throw e;
@@ -54,13 +62,14 @@ export const startCheckout = createServerFn({ method: "POST" })
   });
 
 export const orderStatus = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ orderId: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({ orderId: z.string().uuid(), accessToken: z.string().regex(/^[a-f0-9]{64}$/) }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { paystackVerify } = await import("./paystack.server");
     const { completeAndDeliver } = await import("./delivery.server");
+    const accessHash = await hashOrderAccessToken(data.accessToken);
     const sel = "id, provider, status, codes, result_desc, holder, tier_name, unit_price, total, checkout_request_id, created_at, quantity";
-    let { data: o } = await supabaseAdmin.from("ticket_orders").select(sel).eq("id", data.orderId).eq("email", data.email.trim().toLowerCase()).maybeSingle();
+    let { data: o } = await supabaseAdmin.from("ticket_orders").select(sel).eq("id", data.orderId).eq("ticket_access_hash", accessHash).maybeSingle();
     if (!o) throw new Error("Order not found");
     // A verified provider result, never a browser callback, is what issues tickets.
     if (o.status === "pending" && o.checkout_request_id && Date.now() - +new Date(o.created_at) > 5_000) {

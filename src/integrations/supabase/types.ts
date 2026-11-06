@@ -284,6 +284,7 @@ export type Database = {
           quantity: number
           result_desc: string | null
           status: string
+          ticket_access_hash: string | null
           tier_id: string
           tier_name: string
           total: number
@@ -310,6 +311,7 @@ export type Database = {
           quantity: number
           result_desc?: string | null
           status?: string
+          ticket_access_hash?: string | null
           tier_id: string
           tier_name: string
           total: number
@@ -336,6 +338,7 @@ export type Database = {
           quantity?: number
           result_desc?: string | null
           status?: string
+          ticket_access_hash?: string | null
           tier_id?: string
           tier_name?: string
           total?: number
