@@ -7,7 +7,7 @@ export function Ticket({
 }: { program: Program; event: EventItem; tierName: string; price: number; holder: string; code: string }) {
   const d = new Date(event.date);
   return (
-    <div className="relative mx-auto flex w-full max-w-2xl overflow-hidden rounded-xl bg-paper text-paper-foreground shadow-glow">
+    <div className="relative mx-auto flex w-full max-w-2xl overflow-hidden rounded-xl break-inside-avoid bg-paper text-paper-foreground shadow-glow">
       {/* watermark */}
       <div className="pointer-events-none absolute inset-0 flex select-none flex-wrap content-center gap-x-8 gap-y-2 opacity-[0.07] -rotate-12 scale-125">
         {Array.from({ length: 24 }).map((_, i) => (

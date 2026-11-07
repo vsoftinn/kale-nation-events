@@ -50,7 +50,7 @@ function Admin() {
   const me = useMe();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"events" | "news" | "admins" | "applications" | "programs">("events");
+  const [tab, setTab] = useState<"sales" | "events" | "news" | "admins" | "applications" | "programs">("sales");
 
   async function signOut() {
     await qc.cancelQueries(); qc.clear();
@@ -62,7 +62,7 @@ function Admin() {
   if (!isSuper && !me.data.programIds.length)
     return <div className="p-24 text-center"><p>Your account has no program yet. Ask the super admin.</p><button onClick={signOut} className="mt-4 underline">Sign out</button></div>;
 
-  const tabs = isSuper ? (["events", "news", "admins", "applications", "programs"] as const) : (["events"] as const);
+  const tabs = isSuper ? (["sales", "events", "news", "admins", "applications", "programs"] as const) : (["sales", "events"] as const);
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card">
@@ -80,6 +80,7 @@ function Admin() {
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-10">
+        {tab === "sales" && <SalesTab isSuper={isSuper} />}
         {tab === "events" && <EventsTab isSuper={isSuper} programIds={me.data.programIds} />}
         {tab === "news" && isSuper && <NewsTab />}
         {tab === "admins" && isSuper && <AdminsTab />}
@@ -416,6 +417,68 @@ function ProgramsTab() {
           <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
             <span><b>{p.name}</b> · {p.owner} · {p.events.length} events</span>
             <button onClick={() => confirm(`Delete ${p.name} and all its events?`) && run(supabase.from("programs").delete().eq("id", p.id))} className="text-xs text-destructive underline">Delete</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type SaleRow = { event_id: string; event_title: string; program_name: string; event_date: string; tier_name: string; tickets_sold: number; funds: number; orders: number };
+
+function SalesTab({ isSuper }: { isSuper: boolean }) {
+  const q = useQuery({
+    queryKey: ["sales-summary"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("admin_sales_summary");
+      if (error) throw error;
+      return (data ?? []) as SaleRow[];
+    },
+    refetchInterval: 30_000,
+  });
+  if (q.isLoading) return <p className="text-muted-foreground">Loading sales…</p>;
+  if (q.error) return <p className="text-destructive">{(q.error as Error).message}</p>;
+  const rows = q.data ?? [];
+  const events = new Map<string, { title: string; program: string; date: string; sold: number; funds: number; orders: number; tiers: SaleRow[] }>();
+  for (const r of rows) {
+    const e = events.get(r.event_id) ?? { title: r.event_title, program: r.program_name, date: r.event_date, sold: 0, funds: 0, orders: 0, tiers: [] };
+    e.sold += Number(r.tickets_sold); e.funds += Number(r.funds); e.orders += Number(r.orders); e.tiers.push(r);
+    events.set(r.event_id, e);
+  }
+  const list = [...events.values()].sort((a, b) => b.funds - a.funds);
+  const totSold = list.reduce((s, e) => s + e.sold, 0);
+  const totFunds = list.reduce((s, e) => s + e.funds, 0);
+  const max = Math.max(1, ...list.map((e) => e.funds));
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-5xl">Sales dashboard</h2>
+        <p className="text-sm text-muted-foreground">{isSuper ? "All programs and events." : "Only events in your program."} Paid orders only · refreshes every 30s.</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[["Tickets sold", totSold.toLocaleString()], ["Funds generated", ksh(totFunds)], ["Events with sales", String(list.length)]].map(([l, v]) => (
+          <div key={l} className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">{l}</p>
+            <p className="mt-1 font-display text-4xl text-primary">{v}</p>
+          </div>
+        ))}
+      </div>
+      {!list.length && <p className="text-muted-foreground">No paid tickets yet.</p>}
+      <div className="space-y-4">
+        {list.map((e) => (
+          <div key={e.title + e.date} className="rounded-xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <p className="font-display text-3xl">{e.title}</p>
+                <p className="text-xs text-muted-foreground">{e.program} · {new Date(e.date).toLocaleDateString("en-KE", { dateStyle: "medium" })}</p>
+              </div>
+              <p className="text-right"><span className="font-display text-3xl text-primary">{ksh(e.funds)}</span><br /><span className="text-sm text-muted-foreground">{e.sold} tickets · {e.orders} orders</span></p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-bolt" style={{ width: `${(e.funds / max) * 100}%` }} /></div>
+            <table className="mt-4 w-full text-sm">
+              <thead><tr className="text-left text-xs uppercase text-muted-foreground"><th>Ticket</th><th className="text-right">Sold</th><th className="text-right">Funds</th></tr></thead>
+              <tbody>{e.tiers.map((t) => <tr key={t.tier_name} className="border-t border-border"><td className="py-1.5">{t.tier_name}</td><td className="text-right">{t.tickets_sold}</td><td className="text-right">{ksh(Number(t.funds))}</td></tr>)}</tbody>
+            </table>
           </div>
         ))}
       </div>
