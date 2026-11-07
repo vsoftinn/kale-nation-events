@@ -189,9 +189,9 @@ function EventPage() {
           )}
         </div>
         {bought && (
-          <div className="animate-rise space-y-8 lg:col-span-2">
-            <p className="text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
-            <p className="text-center text-sm text-muted-foreground">A copy goes to your email and WhatsApp once delivery is active.{" "}
+          <div className="ticket-print-area animate-rise space-y-8 lg:col-span-2">
+            <p className="print:hidden text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
+            <p className="print:hidden text-center text-sm text-muted-foreground">A copy goes to your email and WhatsApp once delivery is active.{" "}
               <button onClick={() => window.print()} className="font-bold text-primary underline">Download / save as PDF</button></p>
             {bought.codes.map((code) => (
               <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder={bought.holder} code={code} />

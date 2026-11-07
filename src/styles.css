@@ -117,3 +117,11 @@
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 html { scroll-behavior: smooth; }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body * { visibility: hidden; }
+  .ticket-print-area, .ticket-print-area * { visibility: visible; }
+  .ticket-print-area { position: absolute; inset: 0 auto auto 0; width: 100%; animation: none !important; }
+  .ticket-print-area > div { break-inside: avoid; box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
