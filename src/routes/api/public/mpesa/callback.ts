@@ -11,7 +11,6 @@ export const Route = createFileRoute("/api/public/mpesa/callback")({
         try { cb = (await request.json())?.Body?.stkCallback; } catch { return ack; }
         if (!cb?.CheckoutRequestID || typeof cb.CheckoutRequestID !== "string") return ack;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { ticketCode } = await import("@/lib/mpesa.server");
         const { data: o } = await supabaseAdmin.from("ticket_orders").select("id, quantity, total, status").eq("checkout_request_id", cb.CheckoutRequestID).maybeSingle();
         if (!o || o.status !== "pending") return ack;
         if (cb.ResultCode === 0) {
@@ -22,7 +21,8 @@ export const Route = createFileRoute("/api/public/mpesa/callback")({
             await supabaseAdmin.from("ticket_orders").update({ status: "failed", result_desc: "Amount mismatch" }).eq("id", o.id);
             return ack;
           }
-          await supabaseAdmin.rpc("complete_ticket_order", { _checkout: cb.CheckoutRequestID, _receipt: receipt, _codes: Array.from({ length: o.quantity }, ticketCode) });
+          const { completeAndDeliver } = await import("@/lib/delivery.server");
+          await completeAndDeliver(cb.CheckoutRequestID, receipt, o.quantity);
         } else {
           await supabaseAdmin.from("ticket_orders").update({ status: "failed", result_desc: String(cb.ResultDesc ?? "Cancelled") }).eq("id", o.id);
         }
