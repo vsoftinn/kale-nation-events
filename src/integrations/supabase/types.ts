@@ -42,6 +42,7 @@ export type Database = {
           date: string
           description: string
           id: string
+          image_url: string | null
           lineup: string[]
           program_id: string
           published: boolean
@@ -54,6 +55,7 @@ export type Database = {
           date: string
           description?: string
           id?: string
+          image_url?: string | null
           lineup?: string[]
           program_id: string
           published?: boolean
@@ -66,6 +68,7 @@ export type Database = {
           date?: string
           description?: string
           id?: string
+          image_url?: string | null
           lineup?: string[]
           program_id?: string
           published?: boolean
@@ -241,6 +244,7 @@ export type Database = {
           created_at: string
           id: string
           image_key: string
+          image_url: string | null
           name: string
           owner: string
           slug: string
@@ -250,6 +254,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_key?: string
+          image_url?: string | null
           name: string
           owner?: string
           slug: string
@@ -259,6 +264,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_key?: string
+          image_url?: string | null
           name?: string
           owner?: string
           slug?: string
