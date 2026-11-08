@@ -13,6 +13,7 @@ export type EventItem = {
   city: string;
   lineup: string[];
   published: boolean;
+  imageUrl: string | null;
   tiers: TicketTier[];
 };
 export type Program = {
@@ -22,6 +23,7 @@ export type Program = {
   owner: string;
   tagline: string;
   imageKey: string;
+  imageUrl: string | null;
   events: EventItem[];
 };
 export type Post = {
@@ -40,7 +42,7 @@ export type Post = {
 
 const images: Record<string, string> = { kutit: kutitImg, simba: simbaImg, hero: heroImg };
 export const imageKeys = Object.keys(images);
-export const imageFor = (key: string) => images[key] ?? heroImg;
+export const imageFor = (key: string, ...urls: (string | null | undefined)[]) => urls.find(Boolean) ?? images[key] ?? heroImg;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function mapTier(t: any): TicketTier {
@@ -67,6 +69,7 @@ export function mapEvent(e: any): EventItem {
     city: e.city,
     lineup: e.lineup ?? [],
     published: e.published,
+    imageUrl: e.image_url ?? null,
     tiers: (e.ticket_tiers ?? []).map(mapTier).sort((a: TicketTier, b: TicketTier) => a.name.localeCompare(b.name)),
   };
 }
@@ -78,6 +81,7 @@ export function mapProgram(p: any): Program {
     owner: p.owner,
     tagline: p.tagline,
     imageKey: p.image_key,
+    imageUrl: p.image_url ?? null,
     events: (p.events ?? []).map(mapEvent).sort((a: EventItem, b: EventItem) => +new Date(a.date) - +new Date(b.date)),
   };
 }
