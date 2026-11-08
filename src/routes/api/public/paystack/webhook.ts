@@ -1,4 +1,3 @@
-git pull origin main --allow-unrelated-histories
 import { createFileRoute } from "@tanstack/react-router";
 
 // Paystack posts charge.success here. Signature verified before anything is trusted.
