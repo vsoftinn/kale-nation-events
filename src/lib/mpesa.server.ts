@@ -36,7 +36,7 @@ async function token(c: ReturnType<typeof cfg>) {
   return ((await r.json()) as { access_token: string }).access_token;
 }
 
-export async function stkPush(o: { phone: string; amount: number; reference: string; desc: string }) {
+export async function stkPush(o: { callback?: string; phone: string; amount: number; reference: string; desc: string }) {
   const c = cfg();
   const ts = nairobiTimestamp();
   const r = await fetch(`${c.base}/mpesa/stkpush/v1/processrequest`, {
@@ -51,7 +51,7 @@ export async function stkPush(o: { phone: string; amount: number; reference: str
       PartyA: o.phone,
       PartyB: c.shortcode,
       PhoneNumber: o.phone,
-      CallBackURL: c.callback,
+      CallBackURL: process.env["MPESA_CALLBACK_URL"] || o.callback || c.callback,
       AccountReference: o.reference.slice(0, 12),
       TransactionDesc: o.desc.slice(0, 13),
     }),
