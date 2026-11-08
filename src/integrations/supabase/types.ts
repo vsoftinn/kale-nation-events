@@ -444,6 +444,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_sales_summary: {
+        Args: never
+        Returns: {
+          event_date: string
+          event_id: string
+          event_title: string
+          funds: number
+          orders: number
+          program_id: string
+          program_name: string
+          tickets_sold: number
+          tier_name: string
+        }[]
+      }
       can_manage_program: { Args: { _program_id: string }; Returns: boolean }
       complete_ticket_order: {
         Args: { _checkout: string; _codes: string[]; _receipt: string }

@@ -35,16 +35,29 @@ function EventPage() {
   const [bought, setBought] = useState<{ tier: string; price: number; codes: string[]; total: number; holder: string } | null>(null);
   const [holder, setHolder] = useState("");
   const [phone, setPhone] = useState("");
-  const [pay, setPay] = useState<{ orderId?: string; state: "idle" | "sending" | "waiting" | "failed"; msg?: string }>({ state: "idle" });
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [provider, setProvider] = useState<"mpesa" | "paystack">("mpesa");
+  const [pay, setPay] = useState<{ orderId?: string; token?: string; state: "idle" | "sending" | "waiting" | "failed"; msg?: string }>({ state: "idle" });
   const start = useServerFn(startCheckout);
   const check = useServerFn(orderStatus);
+  // Returning from Paystack: resume checking the saved order.
   useEffect(() => {
-    if (pay.state !== "waiting" || !pay.orderId) return;
+    const saved = sessionStorage.getItem("kn-order");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved) as { orderId: string; token: string; eventId: string };
+      if (s.eventId === id) setPay({ state: "waiting", orderId: s.orderId, token: s.token });
+    } catch { /* ignore */ }
+  }, [id]);
+  useEffect(() => {
+    if (pay.state !== "waiting" || !pay.orderId || !pay.token) return;
     let stop = false; const began = Date.now();
     const tick = async () => {
       if (stop) return;
       try {
-        const r = await check({ data: { orderId: pay.orderId! } });
+        const r = await check({ data: { orderId: pay.orderId!, accessToken: pay.token! } });
+        if (r.status !== "pending") sessionStorage.removeItem("kn-order");
         if (r.status === "paid") { setBought({ tier: r.tierName, price: r.unitPrice, total: r.total, holder: r.holder, codes: r.codes }); setCart(null); setPay({ state: "idle" }); return; }
         if (r.status === "failed") { setPay({ state: "failed", msg: r.message ?? "Payment was not completed" }); return; }
       } catch { /* retry */ }
@@ -130,33 +143,56 @@ function EventPage() {
                 <input value={holder} onChange={(e) => setHolder(e.target.value)} maxLength={60} placeholder="e.g. Wanjiku Kamau"
                   className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
               </label>
+              <p className="mt-4 text-xs uppercase tracking-widest text-muted-foreground">Pay with</p>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                {(["mpesa", "paystack"] as const).map((p) => (
+                  <button key={p} type="button" onClick={() => setProvider(p)} aria-pressed={provider === p}
+                    className={`rounded-md border px-3 py-2 text-sm font-bold ${provider === p ? "border-primary bg-primary/10 text-primary" : "border-border"}`}>
+                    {p === "mpesa" ? "M-Pesa" : "Paystack (card / bank)"}
+                  </button>
+                ))}
+              </div>
               <label className="mt-3 block text-xs uppercase tracking-widest text-muted-foreground">
-                M-Pesa phone number
+                {provider === "mpesa" ? "M-Pesa phone number" : "Phone number"}
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={16} placeholder="0712 345 678"
                   className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
               </label>
-              {pay.state === "waiting" && <p className="mt-3 text-sm text-primary">📲 Check your phone and enter your M-Pesa PIN to pay {ksh(order.total)}…</p>}
+              <label className="mt-3 block text-xs uppercase tracking-widest text-muted-foreground">
+                Email (tickets sent here)
+                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" maxLength={254} placeholder="you@example.com"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
+              </label>
+              <label className="mt-3 block text-xs uppercase tracking-widest text-muted-foreground">
+                WhatsApp number for tickets (optional)
+                <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" maxLength={16} placeholder="0712 345 678"
+                  className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
+              </label>
+              {pay.state === "waiting" && <p className="mt-3 text-sm text-primary">{provider === "mpesa" ? `📲 Check your phone and enter your M-Pesa PIN to pay ${ksh(order.total)}…` : "Confirming your Paystack payment…"}</p>}
               {pay.state === "failed" && <p className="mt-3 text-sm text-destructive">{pay.msg}</p>}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <p className="text-lg">Total <span className="font-display text-3xl text-primary">{ksh(order.total)}</span></p>
                 <button
-                  disabled={holder.trim().length < 2 || phone.replace(/\D/g, "").length < 9 || pay.state === "sending" || pay.state === "waiting"}
+                  disabled={holder.trim().length < 2 || phone.replace(/\D/g, "").length < 9 || !/^\S+@\S+\.\S+$/.test(email.trim()) || pay.state === "sending" || pay.state === "waiting"}
                   onClick={async () => {
                     setPay({ state: "sending" });
                     try {
-                      const r = await start({ data: { tierId: cartTier.id, qty: order.qty, holder: holder.trim(), phone } });
-                      setPay({ state: "waiting", orderId: r.orderId });
+                      const r = await start({ data: { tierId: cartTier.id, qty: order.qty, holder: holder.trim(), phone, email: email.trim(), whatsapp, provider } });
+                      sessionStorage.setItem("kn-order", JSON.stringify({ orderId: r.orderId, token: r.accessToken, eventId: id }));
+                      if (r.paymentUrl) { window.location.href = r.paymentUrl; return; }
+                      setPay({ state: "waiting", orderId: r.orderId, token: r.accessToken });
                     } catch (e) { setPay({ state: "failed", msg: (e as Error).message }); }
                   }}
                   className="rounded-md bg-aurora px-5 py-3 font-bold uppercase text-primary-foreground disabled:opacity-40"
-                >{pay.state === "sending" ? "Sending…" : pay.state === "waiting" ? "Waiting…" : "Pay with M-Pesa"}</button>
+                >{pay.state === "sending" ? "Sending…" : pay.state === "waiting" ? "Waiting…" : provider === "mpesa" ? "Pay with M-Pesa" : "Pay with Paystack"}</button>
               </div>
             </div>
           )}
         </div>
         {bought && (
-          <div className="animate-rise space-y-8 lg:col-span-2">
-            <p className="text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
+          <div className="ticket-print-area animate-rise space-y-8 lg:col-span-2">
+            <p className="print:hidden text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
+            <p className="print:hidden text-center text-sm text-muted-foreground">A copy goes to your email and WhatsApp once delivery is active.{" "}
+              <button onClick={() => window.print()} className="font-bold text-primary underline">Download / save as PDF</button></p>
             {bought.codes.map((code) => (
               <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder={bought.holder} code={code} />
             ))}
