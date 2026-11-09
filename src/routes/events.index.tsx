@@ -39,7 +39,7 @@ function EventsPage() {
             const from = Math.min(...e.tiers.map((t) => activePhase(t)?.price ?? Infinity));
             return (
               <Link key={e.id} to="/events/$id" params={{ id: e.id }} className="group overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-glow">
-                <img src={imageFor(p.imageKey)} alt={e.title} loading="lazy" width={1024} height={768} className="aspect-video w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <img src={imageFor(p.imageKey, e.imageUrl, p.imageUrl)} alt={e.title} loading="lazy" width={1024} height={768} className="aspect-video w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="p-6">
                   <p className="text-xs uppercase tracking-widest text-muted-foreground">{p.name}</p>
                   <h2 className="mt-1 text-4xl">{e.title}</h2>
