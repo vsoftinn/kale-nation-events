@@ -68,6 +68,7 @@ function EventPage() {
     setTimeout(tick, 4000);
     return () => { stop = true; };
   }, [pay.state, pay.orderId]);
+  const [saving, setSaving] = useState(false);
   const [cart, setCart] = useState<{ tierId: string; qty: number } | null>(null);
   const cartTier = cart ? ev.tiers.find((t) => t.id === cart.tierId) : undefined;
   const cartPhase = cartTier ? activePhase(cartTier) : null;
@@ -199,9 +200,16 @@ function EventPage() {
           <div className="ticket-print-area animate-rise space-y-8 lg:col-span-2">
             <p className="print:hidden text-center text-sm uppercase tracking-widest text-primary">⚡ Payment of {ksh(bought.total)} received — here {bought.codes.length > 1 ? `are your ${bought.codes.length} tickets` : "is your ticket"}</p>
             <p className="print:hidden text-center text-sm text-muted-foreground">A copy goes to your email and WhatsApp once delivery is active.{" "}
-              <button onClick={() => window.print()} className="font-bold text-primary underline">Download / save as PDF</button></p>
+              <button disabled={saving} onClick={async () => {
+                setSaving(true);
+                try {
+                  const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-ticket]"));
+                  await (await import("@/lib/ticket-download")).downloadTickets(nodes, `kalee-ticket-${bought.codes[0]}.pdf`);
+                } catch { alert("Could not create the file. Please try again."); }
+                setSaving(false);
+              }} className="font-bold text-primary underline disabled:opacity-50">{saving ? "Preparing…" : "Download ticket"}</button></p>
             {bought.codes.map((code) => (
-              <Ticket key={code} program={program} event={ev} tierName={bought.tier} price={bought.price} holder={bought.holder} code={code} />
+              <div key={code} data-ticket className="mx-auto w-full max-w-2xl"><Ticket program={program} event={ev} tierName={bought.tier} price={bought.price} holder={bought.holder} code={code} /></div>
             ))}
           </div>
         )}
