@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { mapPost, mapProgram, PROGRAM_SELECT, imageKeys, slugify, type EventItem, type Program } from "@/lib/catalog";
+import { mapPost, mapProgram, PROGRAM_SELECT, imageFor, slugify, type EventItem, type Program } from "@/lib/catalog";
 import { activePhase, ksh, statusLabel, tierStatus, type TicketTier } from "@/lib/pricing";
 import { createAdmin, removeAdmin, runAutomationNow } from "@/lib/admin.functions";
 
@@ -110,8 +110,10 @@ function useWrite() {
     setError(error?.message ?? "");
     qc.invalidateQueries({ queryKey: ["admin-programs"] });
     qc.invalidateQueries({ queryKey: ["programs"] });
+    qc.invalidateQueries();
+    return !error;
   };
-  return { run, error };
+  return { run, error, setError };
 }
 
 function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: string[] }) {
@@ -126,13 +128,6 @@ function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: stri
   const sold = tiers.reduce((s, t) => s + t.sold, 0);
   const revenue = tiers.reduce((s, t) => s + t.sold * (activePhase(t)?.price ?? 0), 0);
 
-  const addEvent = async () => {
-    const date = new Date(Date.now() + 30 * 864e5);
-    const { data: ev, error } = await supabase.from("events").insert({ program_id: program.id, title: `New ${program.name} event`, date: date.toISOString(), published: false }).select().single();
-    if (error || !ev) return run(Promise.resolve({ error }));
-    const { data: t } = await supabase.from("ticket_tiers").insert({ event_id: ev.id, name: "Regular", quantity: 500, sales_end_at: date.toISOString() }).select().single();
-    await run(supabase.from("price_phases").insert({ tier_id: t!.id, label: "Early Bird", price: 1000, starts_at: new Date().toISOString() }));
-  };
 
   return (
     <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
@@ -146,8 +141,8 @@ function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: stri
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h1 className="text-6xl">{program.name}</h1>
-          <button onClick={addEvent} className={btn}>+ Post event</button>
         </div>
+        <NewEventForm programs={programs} defaultProgramId={program.id} isSuper={isSuper} onCreated={(pid) => setSel(pid)} />
         {error && <p className="text-destructive">{error}</p>}
         <div className="grid gap-4 sm:grid-cols-3">
           {[["Tickets sold", sold.toLocaleString()], ["Est. revenue", ksh(revenue)], ["Events", String(program.events.length)]].map(([k, v]) => (
@@ -157,32 +152,156 @@ function EventsTab({ isSuper, programIds }: { isSuper: boolean; programIds: stri
             </div>
           ))}
         </div>
-        {program.events.map((ev) => <EventEditor key={ev.id} ev={ev} run={run} />)}
+        {program.events.map((ev) => <EventEditor key={ev.id + ev.title + ev.date + (ev.imageUrl ?? "")} ev={ev} run={run} fallback={imageFor(program.imageKey, program.imageUrl)} />)}
       </div>
     </div>
   );
 }
 
-type Run = (p: PromiseLike<{ error: { message: string } | null }>) => Promise<void>;
+type Run = (p: PromiseLike<{ error: { message: string } | null }>) => Promise<boolean>;
 
-function EventEditor({ ev, run }: { ev: EventItem; run: Run }) {
+/** Upload an event/program photo; empty = use the default Kalee Nation image. */
+function ImagePicker({ value, onChange, fallback }: { value: string | null; onChange: (url: string | null) => void; fallback: string }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setErr("Choose an image file");
+    if (file.size > 8 * 1024 * 1024) return setErr("Image must be under 8 MB");
+    setBusy(true); setErr("");
+    const path = `${crypto.randomUUID()}.${(file.name.split(".").pop() || "jpg").toLowerCase()}`;
+    const up = await supabase.storage.from("event-images").upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    if (up.error) { setErr(up.error.message); setBusy(false); return; }
+    const signed = await supabase.storage.from("event-images").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+    setBusy(false);
+    if (signed.error || !signed.data) return setErr(signed.error?.message ?? "Upload failed");
+    onChange(signed.data.signedUrl);
+  }
+  return (
+    <div className="flex items-center gap-3">
+      <img src={value || fallback} alt="" className="h-16 w-24 rounded-md border border-border object-cover" />
+      <div className="text-xs">
+        <label className="cursor-pointer font-semibold text-primary underline">
+          {busy ? "Uploading…" : value ? "Change photo" : "Upload event photo"}
+          <input type="file" accept="image/*" className="hidden" disabled={busy} onChange={(e) => pick(e.target.files?.[0])} />
+        </label>
+        <p className="text-muted-foreground">{value ? <button type="button" className="underline" onClick={() => onChange(null)}>Use default image</button> : "No photo? The default image is used."}</p>
+        {err && <p className="text-destructive">{err}</p>}
+      </div>
+    </div>
+  );
+}
+
+function NewEventForm({ programs, defaultProgramId, isSuper, onCreated }: { programs: Program[]; defaultProgramId: string; isSuper: boolean; onCreated: (programId: string) => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [programText, setProgramText] = useState("");
+  const [image, setImage] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    setBusy(true); setMsg("");
+    try {
+      // Program: pick an existing one by name, or type a new one (super admin).
+      const typed = programText.trim();
+      let programId = programs.find((p) => p.name.toLowerCase() === typed.toLowerCase())?.id ?? (typed ? "" : defaultProgramId);
+      if (!programId) {
+        if (!isSuper) throw new Error("Choose one of your programs from the list.");
+        const { data: np, error } = await supabase.from("programs").insert({ name: typed, slug: `${slugify(typed)}-${Date.now().toString(36).slice(-4)}`, owner: String(f.get("owner") ?? ""), image_url: image }).select("id").single();
+        if (error || !np) throw new Error(error?.message ?? "Could not create program");
+        programId = np.id;
+      }
+      const date = new Date(String(f.get("date")));
+      if (isNaN(+date)) throw new Error("Pick the event date and time.");
+      const { data: ev, error } = await supabase.from("events").insert({
+        program_id: programId, title: String(f.get("title")).trim(), date: date.toISOString(),
+        venue: String(f.get("venue")).trim() || "TBA", city: String(f.get("city")).trim() || "Nairobi",
+        description: String(f.get("description")), image_url: image, published: f.get("publish") === "on",
+      }).select("id").single();
+      if (error || !ev) throw new Error(error?.message ?? "Could not create event");
+      const { data: t, error: te } = await supabase.from("ticket_tiers").insert({ event_id: ev.id, name: "Regular", quantity: Math.max(1, +String(f.get("qty")) || 500), sales_end_at: date.toISOString() }).select("id").single();
+      if (te || !t) throw new Error(te?.message ?? "Could not add ticket");
+      const pe = await supabase.from("price_phases").insert({ tier_id: t.id, label: "Regular", price: Math.max(0, Math.round(+String(f.get("price")) || 0)), starts_at: new Date().toISOString() });
+      if (pe.error) throw new Error(pe.error.message);
+      form.reset(); setImage(null); setProgramText(""); setOpen(false);
+      setMsg("Event created. Add more ticket types and price changes below.");
+      qc.invalidateQueries(); onCreated(programId);
+    } catch (x) { setMsg((x as Error).message); }
+    setBusy(false);
+  }
+  if (!open) return <div><button onClick={() => setOpen(true)} className={btn}>+ Post event</button>{msg && <p className="mt-2 text-sm">{msg}</p>}</div>;
+  const names = programs.map((p) => p.name);
+  return (
+    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-primary/40 bg-card p-6 sm:grid-cols-4">
+      <h2 className="text-3xl sm:col-span-4">New event</h2>
+      <label className="text-xs text-muted-foreground sm:col-span-2">Program — pick from the list or type a new name
+        <input list="kn-programs" value={programText} onChange={(e) => setProgramText(e.target.value)} placeholder={programs.find((p) => p.id === defaultProgramId)?.name} className={inp} maxLength={80} />
+        <datalist id="kn-programs">{names.map((n) => <option key={n} value={n} />)}</datalist>
+      </label>
+      {isSuper && programText.trim() && !names.some((n) => n.toLowerCase() === programText.trim().toLowerCase()) && (
+        <label className="text-xs text-muted-foreground sm:col-span-2">New program owner<input name="owner" className={inp} maxLength={120} /></label>
+      )}
+      <label className="text-xs text-muted-foreground sm:col-span-4">Event title<input name="title" required maxLength={140} className={inp} /></label>
+      <label className="text-xs text-muted-foreground">Date & time<input name="date" type="datetime-local" required className={inp} /></label>
+      <label className="text-xs text-muted-foreground">City<input name="city" placeholder="Nairobi" className={inp} maxLength={60} /></label>
+      <label className="text-xs text-muted-foreground sm:col-span-2">Venue<input name="venue" placeholder="TBA" className={inp} maxLength={120} /></label>
+      <label className="text-xs text-muted-foreground">Ticket price (KSh)<input name="price" type="number" min={0} defaultValue={1000} className={inp} /></label>
+      <label className="text-xs text-muted-foreground">Tickets available<input name="qty" type="number" min={1} defaultValue={500} className={inp} /></label>
+      <label className="text-xs text-muted-foreground sm:col-span-4">Description<textarea name="description" rows={3} className={inp} /></label>
+      <div className="sm:col-span-4"><ImagePicker value={image} onChange={setImage} fallback={imageFor("hero")} /></div>
+      <label className="flex items-center gap-2 text-sm sm:col-span-4"><input type="checkbox" name="publish" defaultChecked /> Show on the website straight away</label>
+      <div className="flex gap-2 sm:col-span-4">
+        <button disabled={busy} className={btn}>{busy ? "Saving…" : "Create event"}</button>
+        <button type="button" onClick={() => setOpen(false)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button>
+      </div>
+      {msg && <p className="text-sm text-destructive sm:col-span-4">{msg}</p>}
+    </form>
+  );
+}
+
+function EventEditor({ ev, run, fallback }: { ev: EventItem; run: Run; fallback: string }) {
+  const blank = { title: ev.title, date: toLocal(ev.date), city: ev.city, venue: ev.venue, lineup: ev.lineup.join(", "), description: ev.description, image: ev.imageUrl };
+  const [d, setD] = useState(blank);
+  const [saved, setSaved] = useState("");
+  const dirty = JSON.stringify(d) !== JSON.stringify(blank);
   const upd = (patch: any) => run(supabase.from("events").update(patch).eq("id", ev.id));
+  const set = (k: keyof typeof d) => (e: { target: { value: string } }) => { setSaved(""); setD({ ...d, [k]: e.target.value }); };
+  async function save() {
+    if (!d.title.trim() || !d.date) return setSaved("Title and date are required.");
+    const ok = await upd({
+      title: d.title.trim(), date: fromLocal(d.date), city: d.city, venue: d.venue, description: d.description, image_url: d.image,
+      lineup: d.lineup.split(",").map((s) => s.trim()).filter(Boolean),
+    });
+    setSaved(ok ? (ev.published ? "✓ Updated on the live event page" : "✓ Saved (event is still a draft)") : "");
+  }
   return (
     <div className="space-y-4 rounded-xl border border-border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-xs uppercase ${ev.published ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{ev.published ? "Live" : "Draft"}</span>
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full px-2 py-0.5 text-xs uppercase ${ev.published ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{ev.published ? "Live" : "Draft"}</span>
+          {ev.published && <Link to="/events/$id" params={{ id: ev.id }} target="_blank" className="text-xs underline">View live page ↗</Link>}
+        </div>
         <div className="flex gap-2">
           <button onClick={() => upd({ published: !ev.published })} className="rounded-md border border-border px-3 py-1 text-sm">{ev.published ? "Unpublish" : "Publish"}</button>
           <button onClick={() => confirm("Delete this event and its tickets?") && run(supabase.from("events").delete().eq("id", ev.id))} className="rounded-md border border-destructive px-3 py-1 text-sm text-destructive">Delete</button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-4">
-        <label className="text-xs text-muted-foreground sm:col-span-2">Title<input className={inp} defaultValue={ev.title} onBlur={(e) => e.target.value !== ev.title && upd({ title: e.target.value })} /></label>
-        <label className="text-xs text-muted-foreground">Date<input type="datetime-local" className={inp} defaultValue={toLocal(ev.date)} onBlur={(e) => e.target.value && upd({ date: fromLocal(e.target.value) })} /></label>
-        <label className="text-xs text-muted-foreground">City<input className={inp} defaultValue={ev.city} onBlur={(e) => upd({ city: e.target.value })} /></label>
-        <label className="text-xs text-muted-foreground sm:col-span-2">Venue<input className={inp} defaultValue={ev.venue} onBlur={(e) => upd({ venue: e.target.value })} /></label>
-        <label className="text-xs text-muted-foreground sm:col-span-2">Lineup (comma separated)<input className={inp} defaultValue={ev.lineup.join(", ")} onBlur={(e) => upd({ lineup: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} /></label>
-        <label className="text-xs text-muted-foreground sm:col-span-4">Description<textarea rows={2} className={inp} defaultValue={ev.description} onBlur={(e) => upd({ description: e.target.value })} /></label>
+        <label className="text-xs text-muted-foreground sm:col-span-2">Title<input className={inp} value={d.title} onChange={set("title")} maxLength={140} /></label>
+        <label className="text-xs text-muted-foreground">Date<input type="datetime-local" className={inp} value={d.date} onChange={set("date")} /></label>
+        <label className="text-xs text-muted-foreground">City<input className={inp} value={d.city} onChange={set("city")} /></label>
+        <label className="text-xs text-muted-foreground sm:col-span-2">Venue<input className={inp} value={d.venue} onChange={set("venue")} /></label>
+        <label className="text-xs text-muted-foreground sm:col-span-2">Lineup (comma separated)<input className={inp} value={d.lineup} onChange={set("lineup")} /></label>
+        <label className="text-xs text-muted-foreground sm:col-span-4">Description<textarea rows={2} className={inp} value={d.description} onChange={set("description")} /></label>
+        <div className="sm:col-span-4"><ImagePicker value={d.image} onChange={(image) => { setSaved(""); setD({ ...d, image }); }} fallback={fallback} /></div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={save} disabled={!dirty} className={btn}>{ev.published ? "Update live event" : "Save changes"}</button>
+        {dirty && <button onClick={() => setD(blank)} className="text-sm underline">Discard</button>}
+        {saved && <span className="text-sm text-primary">{saved}</span>}
       </div>
       {ev.tiers.map((t) => <TierEditor key={t.id} t={t} run={run} />)}
       <button className="text-sm font-semibold text-primary" onClick={async () => {
@@ -392,13 +511,14 @@ function ApplicationsTab() {
 function ProgramsTab() {
   const { data: programs } = useAdminPrograms();
   const { run, error } = useWrite();
+  const [image, setImage] = useState<string | null>(null);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
     const name = String(f.get("name")).trim();
-    await run(supabase.from("programs").insert({ name, slug: slugify(name), owner: String(f.get("owner")), tagline: String(f.get("tagline")), image_key: String(f.get("image")) }));
-    form.reset();
+    await run(supabase.from("programs").insert({ name, slug: slugify(name), owner: String(f.get("owner")), tagline: String(f.get("tagline")), image_key: "hero", image_url: image }));
+    form.reset(); setImage(null);
   }
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -407,7 +527,7 @@ function ProgramsTab() {
         <input name="name" placeholder="Program name" className={inp} required maxLength={80} />
         <input name="owner" placeholder="Owner / organizer" className={inp} maxLength={120} />
         <input name="tagline" placeholder="Tagline" className={inp} maxLength={200} />
-        <select name="image" className={inp}>{imageKeys.map((k) => <option key={k}>{k}</option>)}</select>
+        <ImagePicker value={image} onChange={setImage} fallback={imageFor("hero")} />
         <button className={btn}>Add program</button>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </form>

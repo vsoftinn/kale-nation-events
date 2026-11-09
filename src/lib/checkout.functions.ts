@@ -2,16 +2,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { activePhase, orderTotal, tierStatus } from "./pricing";
 import { mapTier } from "./catalog";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /** Public site address used for payment return/callback links: SITE_URL, else the address this request came in on. */
-export function siteUrl() {
+function siteUrl(req?: Request) {
   const env = process.env["SITE_URL"]?.replace(/\/$/, "");
   if (env) return env;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const req = (globalThis as any).__knRequest as Request | undefined;
-    if (req) return new URL(req.url).origin;
+    if (req) {
+      const u = new URL(req.url);
+      const host = req.headers.get("x-forwarded-host") || u.host;
+      const proto = req.headers.get("x-forwarded-proto") || u.protocol.replace(":", "");
+      // Payment providers can't reach localhost/sandbox hosts.
+      if (!/localhost|127\.0\.0\.1|id-preview--/.test(host)) return `${proto}://${host}`;
+    }
   } catch { /* ignore */ }
   return "https://kale-ticket-garden.lovable.app";
 }
@@ -32,7 +35,7 @@ export const startCheckout = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { getRequest } = await import("@tanstack/react-start/server");
-    (globalThis as any).__knRequest = getRequest();
+    const base = siteUrl(getRequest());
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { normalizePhone, stkPush } = await import("./mpesa.server");
     const phone = normalizePhone(data.phone);
@@ -58,10 +61,10 @@ export const startCheckout = createServerFn({ method: "POST" })
       let checkoutId: string;
       let paymentUrl: string | undefined;
       if (data.provider === "mpesa") {
-        checkoutId = await stkPush({ callback: `${siteUrl()}/api/public/mpesa/callback`, phone, amount: total, reference: "KaleeNation", desc: "Tickets" });
+        checkoutId = await stkPush({ callback: `${base}/api/public/mpesa/callback`, phone, amount: total, reference: "KaleeNation", desc: "Tickets" });
       } else {
         const { paystackInit } = await import("./paystack.server");
-        const callbackUrl = `${siteUrl()}/events/${row.event_id}?reference=${encodeURIComponent(order.id)}`;
+        const callbackUrl = `${base}/events/${row.event_id}?reference=${encodeURIComponent(order.id)}`;
         paymentUrl = await paystackInit({
           email: data.email.trim().toLowerCase(), amount: total, reference: order.id, callbackUrl,
           metadata: { orderId: order.id, eventId: row.event_id },

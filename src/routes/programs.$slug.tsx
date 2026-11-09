@@ -28,7 +28,7 @@ function ProgramPage() {
     <div>
       <SiteHeader />
       <section className="relative flex min-h-[60vh] items-end overflow-hidden">
-        <img src={imageFor(program.imageKey)} alt={program.name} width={1024} height={768} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={imageFor(program.imageKey, program.imageUrl)} alt={program.name} width={1024} height={768} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-fade" />
         <div className="relative mx-auto w-full max-w-7xl px-4 pb-12">
           <Link to="/events" className="text-sm text-muted-foreground hover:text-foreground">← All events</Link>

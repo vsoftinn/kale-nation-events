@@ -106,7 +106,7 @@ function Index() {
             const ev = p.events[0];
             return (
               <Link key={p.slug} to="/programs/$slug" params={{ slug: p.slug }} className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 hover:-translate-y-1 hover:border-primary/60 hover:shadow-glow animate-rise" style={{ animationDelay: `${i * 0.1}s` }}>
-                <img src={imageFor(p.imageKey)} alt={p.name} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[3/4] w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                <img src={imageFor(p.imageKey, p.imageUrl)} alt={p.name} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[3/4] w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-fade" />
                 <div className="absolute inset-x-0 bottom-0 p-6">
                   <p className="text-xs uppercase tracking-widest text-muted-foreground">by {p.owner}</p>
@@ -142,7 +142,7 @@ function Index() {
                 return (
                   <Link key={e.id} to="/events/$id" params={{ id: e.id }} className="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all duration-500 ease-out hover:-translate-y-1.5 hover:border-primary/60 hover:shadow-glow animate-rise" style={{ animationDelay: `${i * 0.06}s` }}>
                     <div className="relative overflow-hidden">
-                      <img src={imageFor(p.imageKey)} alt={e.title} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[4/3] w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-110" />
+                      <img src={imageFor(p.imageKey, e.imageUrl, p.imageUrl)} alt={e.title} loading="lazy" decoding="async" width={1024} height={768} className="aspect-[4/3] w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-110" />
                       <div className="absolute left-3 top-3 rounded-lg bg-background/80 px-3 py-1 text-center backdrop-blur">
                         <p className="font-display text-2xl leading-none text-aurora">{d.toLocaleDateString("en-KE", { day: "2-digit", timeZone: "Africa/Nairobi" })}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest">{d.toLocaleDateString("en-KE", { month: "short", timeZone: "Africa/Nairobi" })}</p>

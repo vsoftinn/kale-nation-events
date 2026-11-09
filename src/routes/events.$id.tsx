@@ -38,7 +38,7 @@ function EventPage() {
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [provider, setProvider] = useState<"mpesa" | "paystack">("mpesa");
-  const [pay, setPay] = useState<{ orderId?: string; token?: string; state: "idle" | "sending" | "waiting" | "failed"; msg?: string }>({ state: "idle" });
+  const [pay, setPay] = useState<{ orderId?: string; token?: string; state: "idle" | "sending" | "waiting" | "unconfirmed" | "failed"; msg?: string }>({ state: "idle" });
   const start = useServerFn(startCheckout);
   const check = useServerFn(orderStatus);
   // Returning from Paystack: resume checking the saved order.
@@ -61,8 +61,9 @@ function EventPage() {
         if (r.status === "paid") { setBought({ tier: r.tierName, price: r.unitPrice, total: r.total, holder: r.holder, codes: r.codes }); setCart(null); setPay({ state: "idle" }); return; }
         if (r.status === "failed") { setPay({ state: "failed", msg: r.message ?? "Payment was not completed" }); return; }
       } catch { /* retry */ }
-      if (Date.now() - began > 120_000) { setPay({ state: "failed", msg: "No confirmation yet. If you paid, your tickets will be honoured — contact us with your M-Pesa message." }); return; }
-      setTimeout(tick, 3000);
+      // Never report failure just because confirmation is slow: keep checking, then let the buyer re-check.
+      if (Date.now() - began > 300_000) { setPay((p) => ({ ...p, state: "unconfirmed" })); return; }
+      setTimeout(tick, Date.now() - began > 60_000 ? 8000 : 3000);
     };
     setTimeout(tick, 4000);
     return () => { stop = true; };
@@ -76,7 +77,7 @@ function EventPage() {
     <div>
       <SiteHeader />
       <section className="relative flex min-h-[60vh] items-end overflow-hidden">
-        <img src={imageFor(program.imageKey)} alt={ev.title} width={1024} height={768} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={imageFor(program.imageKey, ev.imageUrl, program.imageUrl)} alt={ev.title} width={1024} height={768} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-fade" />
         <div className="relative mx-auto w-full max-w-7xl px-4 pb-12">
           <Link to="/programs/$slug" params={{ slug: program.slug }} className="text-sm text-muted-foreground hover:text-foreground">← {program.name}</Link>
@@ -168,11 +169,17 @@ function EventPage() {
                   className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-base normal-case tracking-normal text-foreground" />
               </label>
               {pay.state === "waiting" && <p className="mt-3 text-sm text-primary">{provider === "mpesa" ? `📲 Check your phone and enter your M-Pesa PIN to pay ${ksh(order.total)}…` : "Confirming your Paystack payment…"}</p>}
+              {pay.state === "unconfirmed" && (
+                <div className="mt-3 rounded-md bg-secondary p-3 text-sm">
+                  <p>We haven't received the payment confirmation yet. If you already paid, don't pay again — your tickets will appear once it arrives.</p>
+                  <button onClick={() => setPay((p) => ({ ...p, state: "waiting" }))} className="mt-2 font-semibold text-primary underline">Check again</button>
+                </div>
+              )}
               {pay.state === "failed" && <p className="mt-3 text-sm text-destructive">{pay.msg}</p>}
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <p className="text-lg">Total <span className="font-display text-3xl text-primary">{ksh(order.total)}</span></p>
                 <button
-                  disabled={holder.trim().length < 2 || phone.replace(/\D/g, "").length < 9 || !/^\S+@\S+\.\S+$/.test(email.trim()) || pay.state === "sending" || pay.state === "waiting"}
+                  disabled={holder.trim().length < 2 || phone.replace(/\D/g, "").length < 9 || !/^\S+@\S+\.\S+$/.test(email.trim()) || pay.state === "sending" || pay.state === "waiting" || pay.state === "unconfirmed"}
                   onClick={async () => {
                     setPay({ state: "sending" });
                     try {
